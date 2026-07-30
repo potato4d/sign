@@ -49,10 +49,6 @@ body {
   display: none !important;
 }
 
-body.workspace-empty {
-  grid-template-rows: minmax(0, 1fr);
-}
-
 button {
   font: inherit;
 }
@@ -72,6 +68,11 @@ button:focus-visible {
   background: var(--chrome);
   border-bottom: 1px solid var(--chrome-border);
   user-select: none;
+  -webkit-app-region: drag;
+}
+
+.platform-darwin .tab-bar {
+  padding-left: 4.5rem;
 }
 
 .tab-list {
@@ -93,6 +94,7 @@ button:focus-visible {
   min-width: 7.5rem;
   height: 100%;
   border-right: 1px solid var(--chrome-border);
+  -webkit-app-region: no-drag;
 }
 
 .tab--active {
@@ -167,6 +169,7 @@ button:focus-visible {
   border-left: 1px solid var(--chrome-border);
   border-radius: 0;
   font-size: 1.15rem;
+  -webkit-app-region: no-drag;
 }
 
 .tab__select:hover,
@@ -197,8 +200,10 @@ button:focus-visible {
   color: var(--chrome-text);
 }
 
-body.workspace-empty .empty-workspace {
-  grid-area: 1 / 1;
+body.workspace-empty .tab-list,
+body.workspace-empty .open-files {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .empty-workspace__actions {

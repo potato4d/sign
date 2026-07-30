@@ -32,6 +32,7 @@ focuses its existing window and opens them as tabs.
 - Reopening a saved file reads its current contents from disk.
 - With no tabs open, centered New File and Open File actions replace the editor. Closing once more
   quits the application.
+- On macOS, the tab bar replaces the standard title bar while preserving the native window buttons.
 
 ## Keyboard shortcuts
 

@@ -24,6 +24,15 @@ export const createMainWindow = (ipcHandlers: AppIpcHandlers): BrowserWindow => 
     show: false,
     title: activeDocument ? `${activeDocument.fileName} — Winzig` : 'Winzig',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
+    ...(process.platform === 'darwin'
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: {
+            x: 12,
+            y: 11,
+          },
+        }
+      : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       allowRunningInsecureContent: false,
@@ -35,6 +44,10 @@ export const createMainWindow = (ipcHandlers: AppIpcHandlers): BrowserWindow => 
       webviewTag: false,
     },
   });
+
+  if (process.platform === 'darwin') {
+    mainWindow.setWindowButtonVisibility(true);
+  }
 
   hardenWindowNavigation(mainWindow, trustedEntry);
   const disposeIpc = registerAppIpc(mainWindow, ipcHandlers);

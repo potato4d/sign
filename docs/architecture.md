@@ -77,6 +77,14 @@ focus or replace the visible error state.
 - Closing from an empty workspace requests application termination through a dedicated capability.
   Main accepts that request only while its authoritative workspace contains no documents.
 
+## Window chrome
+
+- macOS uses an inset hidden title bar so renderer chrome reaches the top edge while the native
+  close, minimize, and zoom buttons remain owned by the operating system.
+- The tab bar is the window drag region. Tabs and toolbar buttons explicitly opt out so they remain
+  interactive, and the leading inset keeps content clear of the native window buttons.
+- Other platforms retain their native title bars until equivalent window controls are implemented.
+
 ## Security invariants
 
 - Renderer sandboxing and context isolation remain enabled.

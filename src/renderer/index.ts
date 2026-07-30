@@ -33,7 +33,6 @@ const openFilesButton = requireElement<HTMLButtonElement>('#open-files');
 const quickSwitcherElement = requireElement<HTMLDialogElement>('#quick-switcher');
 const quickSwitcherInput = requireElement<HTMLInputElement>('#quick-switcher-input');
 const quickSwitcherResults = requireElement<HTMLDivElement>('#quick-switcher-results');
-const tabBarElement = requireElement<HTMLElement>('.tab-bar');
 const tabListElement = requireElement<HTMLDivElement>('#tab-list');
 
 const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
@@ -93,6 +92,7 @@ const editor = monaco.editor.create(editorElement, {
   theme: themeForPreferences(),
   wordWrap: 'off',
 });
+document.body.classList.add(`platform-${window.desktop.platform}`);
 
 const showNotice = (message: string): void => {
   noticeElement.textContent = message;
@@ -417,7 +417,6 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
   document.body.classList.toggle('workspace-empty', isEmpty);
   emptyWorkspaceElement.hidden = !isEmpty;
   editorElement.hidden = isEmpty;
-  tabBarElement.hidden = isEmpty;
 
   if (state.activeDocumentId && tabsByDocumentId.has(state.activeDocumentId)) {
     editor.layout();
