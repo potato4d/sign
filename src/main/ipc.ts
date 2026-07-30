@@ -19,6 +19,7 @@ export interface AppIpcHandlers {
   readonly createDocument: () => EditorWorkspaceState;
   readonly getWorkspaceState: () => EditorWorkspaceState;
   readonly openFiles: () => Promise<EditorWorkspaceState>;
+  readonly quitApplicationIfEmpty: () => boolean;
   readonly reopenClosedDocument: () => Promise<EditorWorkspaceState>;
   readonly saveDocument: (documentId: string, contents: string) => Promise<DocumentSaveResult>;
   readonly saveDocumentAs: (documentId: string, contents: string) => Promise<DocumentSaveResult>;
@@ -63,6 +64,11 @@ export const registerAppIpc = (
   ipcMain.handle(IPC_CHANNELS.createDocument, (event): EditorWorkspaceState => {
     assertExpectedSender(event, mainWindow);
     return handlers.createDocument();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.quitApplicationIfEmpty, (event): boolean => {
+    assertExpectedSender(event, mainWindow);
+    return handlers.quitApplicationIfEmpty();
   });
 
   ipcMain.handle(
@@ -114,6 +120,7 @@ export const registerAppIpc = (
     ipcMain.removeHandler(IPC_CHANNELS.createDocument);
     ipcMain.removeHandler(IPC_CHANNELS.getWorkspaceState);
     ipcMain.removeHandler(IPC_CHANNELS.openFiles);
+    ipcMain.removeHandler(IPC_CHANNELS.quitApplicationIfEmpty);
     ipcMain.removeHandler(IPC_CHANNELS.reopenClosedDocument);
     ipcMain.removeHandler(IPC_CHANNELS.saveDocument);
     ipcMain.removeHandler(IPC_CHANNELS.saveDocumentAs);

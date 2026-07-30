@@ -6,6 +6,7 @@ import {
   EMPTY_WORKSPACE_STATE,
   activateWorkspaceDocument,
   addWorkspaceDocument,
+  canQuitApplication,
   closeWorkspaceDocument,
   mergeFileResults,
   restoreWorkspaceDocument,
@@ -25,6 +26,13 @@ const documentResult = (filePath: string): FileOpenResult => ({
 });
 
 describe('workspace state', () => {
+  it('allows application exit only when no documents remain open', () => {
+    const openState = addWorkspaceDocument(EMPTY_WORKSPACE_STATE, openedDocument('/one.ts'));
+
+    expect(canQuitApplication(EMPTY_WORKSPACE_STATE)).toBe(true);
+    expect(canQuitApplication(openState)).toBe(false);
+  });
+
   it('adds unique documents in order and activates the newest', () => {
     const state = mergeFileResults(
       EMPTY_WORKSPACE_STATE,

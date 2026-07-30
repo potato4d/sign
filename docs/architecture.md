@@ -74,6 +74,8 @@ focus or replace the visible error state.
 - Monaco remains authoritative for text-editing bindings such as undo, search, replacement, folding,
   comments, and multiple cursors.
 - Zoom and full-screen behavior use native Electron roles.
+- Closing from an empty workspace requests application termination through a dedicated capability.
+  Main accepts that request only while its authoritative workspace contains no documents.
 
 ## Security invariants
 

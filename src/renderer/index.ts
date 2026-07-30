@@ -25,11 +25,15 @@ const requireElement = <ElementType extends Element>(selector: string): ElementT
 };
 
 const editorElement = requireElement<HTMLElement>('#editor');
+const emptyWorkspaceElement = requireElement<HTMLElement>('#empty-workspace');
+const createEmptyFileButton = requireElement<HTMLButtonElement>('#create-empty-file');
+const openEmptyFileButton = requireElement<HTMLButtonElement>('#open-empty-file');
 const noticeElement = requireElement<HTMLDivElement>('#notice');
 const openFilesButton = requireElement<HTMLButtonElement>('#open-files');
 const quickSwitcherElement = requireElement<HTMLDialogElement>('#quick-switcher');
 const quickSwitcherInput = requireElement<HTMLInputElement>('#quick-switcher-input');
 const quickSwitcherResults = requireElement<HTMLDivElement>('#quick-switcher-results');
+const tabBarElement = requireElement<HTMLElement>('.tab-bar');
 const tabListElement = requireElement<HTMLDivElement>('#tab-list');
 
 const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
@@ -379,8 +383,10 @@ const createTab = (document: OpenedDocument): EditorTab => {
 };
 
 const applyWorkspaceState = (state: EditorWorkspaceState): void => {
+  const wasEmpty = workspaceState.documents.length === 0;
   saveViewState(workspaceState.activeDocumentId);
   workspaceState = state;
+  const isEmpty = state.documents.length === 0;
   const openDocumentIds = new Set(state.documents.map((document) => document.documentId));
 
   for (const document of state.documents) {
@@ -408,12 +414,21 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
   }
 
   renderTabs();
+  document.body.classList.toggle('workspace-empty', isEmpty);
+  emptyWorkspaceElement.hidden = !isEmpty;
+  editorElement.hidden = isEmpty;
+  tabBarElement.hidden = isEmpty;
 
   if (state.activeDocumentId && tabsByDocumentId.has(state.activeDocumentId)) {
+    editor.layout();
     activateTabLocally(state.activeDocumentId);
   } else {
     editor.setModel(emptyModel);
     document.title = 'Winzig';
+
+    if (!wasEmpty || document.activeElement === document.body) {
+      createEmptyFileButton.focus({ preventScroll: true });
+    }
   }
 
   if (state.error) {
@@ -448,6 +463,16 @@ const reopenClosedDocument = async (): Promise<void> => {
     applyWorkspaceState(await window.desktop.reopenClosedDocument());
   } catch {
     showNotice('The closed tab could not be restored.');
+  }
+};
+
+const quitApplicationIfEmpty = async (): Promise<void> => {
+  try {
+    if (!(await window.desktop.quitApplicationIfEmpty())) {
+      showNotice('The application can only quit from an empty workspace.');
+    }
+  } catch {
+    showNotice('The application could not be closed.');
   }
 };
 
@@ -586,6 +611,8 @@ const runEditorCommand = (command: EditorCommand): void => {
     case 'close-active-document':
       if (workspaceState.activeDocumentId) {
         void closeDocument(workspaceState.activeDocumentId);
+      } else {
+        void quitApplicationIfEmpty();
       }
       break;
     case 'command-palette':
@@ -640,6 +667,12 @@ const updateMotionPreferences = (): void => {
 };
 
 openFilesButton.addEventListener('click', () => {
+  void openFiles();
+});
+createEmptyFileButton.addEventListener('click', () => {
+  void createDocument();
+});
+openEmptyFileButton.addEventListener('click', () => {
   void openFiles();
 });
 quickSwitcherInput.addEventListener('input', renderQuickSwitcher);

@@ -6,6 +6,7 @@ export const IPC_CHANNELS = {
   editorCommand: 'editor:command',
   getWorkspaceState: 'workspace:get-state',
   openFiles: 'workspace:open-files',
+  quitApplicationIfEmpty: 'application:quit-if-empty',
   reopenClosedDocument: 'workspace:reopen-closed-document',
   saveDocument: 'workspace:save-document',
   saveDocumentAs: 'workspace:save-document-as',
@@ -95,6 +96,7 @@ export interface DesktopApi {
   onWorkspaceStateChanged(listener: (state: EditorWorkspaceState) => void): () => void;
   openFiles(): Promise<EditorWorkspaceState>;
   readonly platform: DesktopPlatform;
+  quitApplicationIfEmpty(): Promise<boolean>;
   reopenClosedDocument(): Promise<EditorWorkspaceState>;
   saveDocument(documentId: string, contents: string): Promise<DocumentSaveResult>;
   saveDocumentAs(documentId: string, contents: string): Promise<DocumentSaveResult>;

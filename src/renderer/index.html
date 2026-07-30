@@ -24,6 +24,20 @@
       </button>
     </header>
     <main id="editor" aria-label="Text editor"></main>
+    <section id="empty-workspace" class="empty-workspace" aria-label="Start editing" hidden>
+      <div class="empty-workspace__actions">
+        <button id="create-empty-file" class="empty-workspace__action" type="button">
+          <span class="empty-workspace__icon empty-workspace__icon--new" aria-hidden="true"
+            >＋</span
+          >
+          <span>New File</span>
+        </button>
+        <button id="open-empty-file" class="empty-workspace__action" type="button">
+          <span class="empty-workspace__icon" aria-hidden="true">📁</span>
+          <span>Open File</span>
+        </button>
+      </div>
+    </section>
     <dialog id="quick-switcher" class="quick-switcher" aria-label="Quick switcher">
       <input
         id="quick-switcher-input"

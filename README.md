@@ -30,6 +30,8 @@ focuses its existing window and opens them as tabs.
 - Use the close button or middle-click a tab to close it.
 - Closing a modified tab offers to save, discard, or cancel.
 - Reopening a saved file reads its current contents from disk.
+- With no tabs open, centered New File and Open File actions replace the editor. Closing once more
+  quits the application.
 
 ## Keyboard shortcuts
 
@@ -37,21 +39,21 @@ The application menu is the source of truth for desktop-level shortcuts. Monaco 
 editing bindings for undo, redo, search, replace, navigation, comments, folding, and multiple
 cursors.
 
-| Action                | macOS                                                                                                      | Windows / Linux                                                                             |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| New file              | <kbd>Command</kbd>+<kbd>N</kbd>                                                                            | <kbd>Control</kbd>+<kbd>N</kbd>                                                             |
-| Open files            | <kbd>Command</kbd>+<kbd>O</kbd>                                                                            | <kbd>Control</kbd>+<kbd>O</kbd>                                                             |
-| Save                  | <kbd>Command</kbd>+<kbd>S</kbd>                                                                            | <kbd>Control</kbd>+<kbd>S</kbd>                                                             |
-| Save as               | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>                                            |
-| Close current tab     | <kbd>Command</kbd>+<kbd>W</kbd>                                                                            | <kbd>Control</kbd>+<kbd>W</kbd>                                                             |
-| Reopen closed tab     | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>                                            |
-| Quick switcher        | <kbd>Command</kbd>+<kbd>P</kbd>                                                                            | <kbd>Control</kbd>+<kbd>P</kbd>                                                             |
-| Command palette       | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>                                            |
-| Next tab              | <kbd>Control</kbd>+<kbd>Tab</kbd> or <kbd>Command</kbd>+<kbd>Option</kbd>+<kbd>Right</kbd>                 | <kbd>Control</kbd>+<kbd>Tab</kbd> or <kbd>Control</kbd>+<kbd>Page Down</kbd>                |
-| Previous tab          | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> or <kbd>Command</kbd>+<kbd>Option</kbd>+<kbd>Left</kbd> | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> or <kbd>Control</kbd>+<kbd>Page Up</kbd> |
-| Select tab 1–8 / last | <kbd>Command</kbd>+<kbd>1–8</kbd> / <kbd>Command</kbd>+<kbd>9</kbd>                                        | <kbd>Control</kbd>+<kbd>1–8</kbd> / <kbd>Control</kbd>+<kbd>9</kbd>                         |
-| Toggle word wrap      | <kbd>Option</kbd>+<kbd>Z</kbd>                                                                             | <kbd>Alt</kbd>+<kbd>Z</kbd>                                                                 |
-| Zoom in/out/reset     | <kbd>Command</kbd>+<kbd>=/-/0</kbd>                                                                        | <kbd>Control</kbd>+<kbd>=/-/0</kbd>                                                         |
+| Action                      | macOS                                                                                                      | Windows / Linux                                                                             |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| New file                    | <kbd>Command</kbd>+<kbd>N</kbd>                                                                            | <kbd>Control</kbd>+<kbd>N</kbd>                                                             |
+| Open files                  | <kbd>Command</kbd>+<kbd>O</kbd>                                                                            | <kbd>Control</kbd>+<kbd>O</kbd>                                                             |
+| Save                        | <kbd>Command</kbd>+<kbd>S</kbd>                                                                            | <kbd>Control</kbd>+<kbd>S</kbd>                                                             |
+| Save as                     | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>                                            |
+| Close tab / quit when empty | <kbd>Command</kbd>+<kbd>W</kbd>                                                                            | <kbd>Control</kbd>+<kbd>W</kbd>                                                             |
+| Reopen closed tab           | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>                                            |
+| Quick switcher              | <kbd>Command</kbd>+<kbd>P</kbd>                                                                            | <kbd>Control</kbd>+<kbd>P</kbd>                                                             |
+| Command palette             | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>                                            |
+| Next tab                    | <kbd>Control</kbd>+<kbd>Tab</kbd> or <kbd>Command</kbd>+<kbd>Option</kbd>+<kbd>Right</kbd>                 | <kbd>Control</kbd>+<kbd>Tab</kbd> or <kbd>Control</kbd>+<kbd>Page Down</kbd>                |
+| Previous tab                | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> or <kbd>Command</kbd>+<kbd>Option</kbd>+<kbd>Left</kbd> | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> or <kbd>Control</kbd>+<kbd>Page Up</kbd> |
+| Select tab 1–8 / last       | <kbd>Command</kbd>+<kbd>1–8</kbd> / <kbd>Command</kbd>+<kbd>9</kbd>                                        | <kbd>Control</kbd>+<kbd>1–8</kbd> / <kbd>Control</kbd>+<kbd>9</kbd>                         |
+| Toggle word wrap            | <kbd>Option</kbd>+<kbd>Z</kbd>                                                                             | <kbd>Alt</kbd>+<kbd>Z</kbd>                                                                 |
+| Zoom in/out/reset           | <kbd>Command</kbd>+<kbd>=/-/0</kbd>                                                                        | <kbd>Control</kbd>+<kbd>=/-/0</kbd>                                                         |
 
 ## Commands
 

@@ -25,6 +25,7 @@ import {
   EMPTY_WORKSPACE_STATE,
   activateWorkspaceDocument,
   addWorkspaceDocument,
+  canQuitApplication,
   closeWorkspaceDocument,
   mergeFileResults,
   restoreWorkspaceDocument,
@@ -323,6 +324,17 @@ const confirmClose = async (documentId: string): Promise<CloseDecision> => {
   return response === 0 ? 'save' : response === 1 ? 'discard' : 'cancel';
 };
 
+const quitApplicationIfEmpty = (): boolean => {
+  if (!canQuitApplication(workspaceState)) {
+    return false;
+  }
+
+  setImmediate(() => {
+    app.quit();
+  });
+  return true;
+};
+
 const ipcHandlers: AppIpcHandlers = {
   activateDocument: (documentId) =>
     publishWorkspaceState(activateWorkspaceDocument(workspaceState, documentId)),
@@ -331,6 +343,7 @@ const ipcHandlers: AppIpcHandlers = {
   createDocument,
   getWorkspaceState: () => workspaceState,
   openFiles: openFilesWithDialog,
+  quitApplicationIfEmpty,
   reopenClosedDocument,
   saveDocument,
   saveDocumentAs,

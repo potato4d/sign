@@ -6,6 +6,9 @@ export const EMPTY_WORKSPACE_STATE: EditorWorkspaceState = {
   error: null,
 };
 
+export const canQuitApplication = (state: EditorWorkspaceState): boolean =>
+  state.documents.length === 0;
+
 interface MergeFileResultsOptions {
   readonly activateNewest: boolean;
   readonly updateError: boolean;

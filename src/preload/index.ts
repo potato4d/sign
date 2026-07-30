@@ -90,6 +90,15 @@ const desktopApi: DesktopApi = Object.freeze({
   platform: (process.platform === 'darwin' || process.platform === 'win32'
     ? process.platform
     : 'linux') satisfies DesktopPlatform,
+  quitApplicationIfEmpty: async (): Promise<boolean> => {
+    const didQuit: unknown = await ipcRenderer.invoke(IPC_CHANNELS.quitApplicationIfEmpty);
+
+    if (typeof didQuit !== 'boolean') {
+      throw new TypeError('The main process returned an invalid quit result.');
+    }
+
+    return didQuit;
+  },
   reopenClosedDocument: () => invokeWorkspaceState(IPC_CHANNELS.reopenClosedDocument),
   saveDocument: (documentId: string, contents: string) =>
     invokeSave(IPC_CHANNELS.saveDocument, documentId, contents),
