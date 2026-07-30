@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:*; font-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Winzig</title>
+    <script type="module" src="/index.ts"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero" aria-labelledby="app-title">
+        <p class="eyebrow">Desktop foundation</p>
+        <h1 id="app-title">Winzig</h1>
+        <p class="summary">
+          A focused starting point for a secure, typed, and maintainable desktop application.
+        </p>
+
+        <div class="runtime" aria-live="polite">
+          <span class="runtime__indicator" aria-hidden="true"></span>
+          <span id="runtime-status">Checking runtime boundaries…</span>
+        </div>
+      </section>
+
+      <section class="boundaries" aria-labelledby="boundaries-title">
+        <div class="section-heading">
+          <p class="eyebrow">Architecture</p>
+          <h2 id="boundaries-title">Small surfaces, clear responsibilities.</h2>
+        </div>
+
+        <ol class="boundary-list">
+          <li>
+            <span class="boundary-list__number">01</span>
+            <div>
+              <h3>Main</h3>
+              <p>Owns native capabilities and application lifecycle.</p>
+            </div>
+          </li>
+          <li>
+            <span class="boundary-list__number">02</span>
+            <div>
+              <h3>Preload</h3>
+              <p>Exposes only deliberate, typed capabilities.</p>
+            </div>
+          </li>
+          <li>
+            <span class="boundary-list__number">03</span>
+            <div>
+              <h3>Renderer</h3>
+              <p>Stays inside the browser sandbox and renders the interface.</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+    </main>
+  </body>
+</html>
