@@ -3,32 +3,47 @@ import './styles.css';
 
 import * as monaco from 'monaco-editor';
 
-import type { EditorWorkspaceState, OpenedDocument } from '../shared/desktop-api';
+import type { EditorCommand, EditorWorkspaceState, OpenedDocument } from '../shared/desktop-api';
+
+import { resolveKeyboardShortcut } from './keyboard-shortcuts';
 
 interface EditorTab {
   readonly contentListener: monaco.IDisposable;
-  readonly initialAlternativeVersionId: number;
   readonly model: monaco.editor.ITextModel;
+  savedAlternativeVersionId: number;
   viewState: monaco.editor.ICodeEditorViewState | null;
 }
 
-const editorElement = document.querySelector<HTMLElement>('#editor');
-const noticeElement = document.querySelector<HTMLDivElement>('#notice');
-const openFilesButton = document.querySelector<HTMLButtonElement>('#open-files');
-const tabListElement = document.querySelector<HTMLDivElement>('#tab-list');
+const requireElement = <ElementType extends Element>(selector: string): ElementType => {
+  const element = document.querySelector<ElementType>(selector);
 
-if (!editorElement || !noticeElement || !openFilesButton || !tabListElement) {
-  throw new Error('The editor workspace is incomplete.');
-}
+  if (!element) {
+    throw new Error(`The editor workspace is missing ${selector}.`);
+  }
+
+  return element;
+};
+
+const editorElement = requireElement<HTMLElement>('#editor');
+const noticeElement = requireElement<HTMLDivElement>('#notice');
+const openFilesButton = requireElement<HTMLButtonElement>('#open-files');
+const quickSwitcherElement = requireElement<HTMLDialogElement>('#quick-switcher');
+const quickSwitcherInput = requireElement<HTMLInputElement>('#quick-switcher-input');
+const quickSwitcherResults = requireElement<HTMLDivElement>('#quick-switcher-results');
+const tabListElement = requireElement<HTMLDivElement>('#tab-list');
 
 const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
 const highContrast = window.matchMedia('(prefers-contrast: more)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const emptyModel = monaco.editor.createModel('', 'plaintext');
-const tabsByFilePath = new Map<string, EditorTab>();
-const tabButtonsByFilePath = new Map<string, HTMLButtonElement>();
+const tabsByDocumentId = new Map<string, EditorTab>();
+const tabButtonsByDocumentId = new Map<string, HTMLButtonElement>();
+const shortcutPlatform = window.desktop.platform === 'darwin' ? 'macos' : 'other';
+let quickSwitcherDocumentIds: string[] = [];
+let quickSwitcherSelection = 0;
+let wordWrapEnabled = false;
 let workspaceState: EditorWorkspaceState = {
-  activeFilePath: null,
+  activeDocumentId: null,
   documents: [],
   error: null,
 };
@@ -72,6 +87,7 @@ const editor = monaco.editor.create(editorElement, {
     enabled: true,
   },
   theme: themeForPreferences(),
+  wordWrap: 'off',
 });
 
 const showNotice = (message: string): void => {
@@ -84,18 +100,18 @@ const hideNotice = (): void => {
   noticeElement.textContent = '';
 };
 
-const documentForPath = (filePath: string | null): OpenedDocument | undefined =>
-  workspaceState.documents.find((document) => document.filePath === filePath);
+const documentForId = (documentId: string | null): OpenedDocument | undefined =>
+  workspaceState.documents.find((document) => document.documentId === documentId);
 
 const isTabDirty = (tab: EditorTab): boolean =>
-  tab.model.getAlternativeVersionId() !== tab.initialAlternativeVersionId;
+  tab.model.getAlternativeVersionId() !== tab.savedAlternativeVersionId;
 
-const saveViewState = (filePath: string | null): void => {
-  if (!filePath) {
+const saveViewState = (documentId: string | null): void => {
+  if (!documentId) {
     return;
   }
 
-  const tab = tabsByFilePath.get(filePath);
+  const tab = tabsByDocumentId.get(documentId);
 
   if (tab && editor.getModel() === tab.model) {
     tab.viewState = editor.saveViewState();
@@ -103,10 +119,10 @@ const saveViewState = (filePath: string | null): void => {
 };
 
 const updateTabPresentation = (): void => {
-  for (const [filePath, button] of tabButtonsByFilePath) {
-    const tab = tabsByFilePath.get(filePath);
-    const document = documentForPath(filePath);
-    const isActive = filePath === workspaceState.activeFilePath;
+  for (const [documentId, button] of tabButtonsByDocumentId) {
+    const tab = tabsByDocumentId.get(documentId);
+    const document = documentForId(documentId);
+    const isActive = documentId === workspaceState.activeDocumentId;
     const isDirty = tab ? isTabDirty(tab) : false;
 
     button.setAttribute('aria-selected', String(isActive));
@@ -125,21 +141,21 @@ const updateTabPresentation = (): void => {
   }
 };
 
-const activateTabLocally = (filePath: string, focusEditor = true): void => {
-  const tab = tabsByFilePath.get(filePath);
-  const openedDocument = documentForPath(filePath);
+const activateTabLocally = (documentId: string, focusEditor = true): void => {
+  const tab = tabsByDocumentId.get(documentId);
+  const openedDocument = documentForId(documentId);
 
   if (!tab || !openedDocument) {
     return;
   }
 
-  if (workspaceState.activeFilePath !== filePath) {
-    saveViewState(workspaceState.activeFilePath);
+  if (workspaceState.activeDocumentId !== documentId) {
+    saveViewState(workspaceState.activeDocumentId);
   }
 
   workspaceState = {
     ...workspaceState,
-    activeFilePath: filePath,
+    activeDocumentId: documentId,
   };
 
   editor.setModel(tab.model);
@@ -150,7 +166,7 @@ const activateTabLocally = (filePath: string, focusEditor = true): void => {
 
   document.title = `${openedDocument.fileName} — Winzig`;
   updateTabPresentation();
-  tabButtonsByFilePath.get(filePath)?.scrollIntoView({
+  tabButtonsByDocumentId.get(documentId)?.scrollIntoView({
     block: 'nearest',
     inline: 'nearest',
   });
@@ -160,33 +176,114 @@ const activateTabLocally = (filePath: string, focusEditor = true): void => {
   }
 };
 
-const activateDocument = async (filePath: string): Promise<void> => {
-  activateTabLocally(filePath);
+const activateDocument = async (documentId: string): Promise<void> => {
+  activateTabLocally(documentId);
 
   try {
-    applyWorkspaceState(await window.desktop.activateDocument(filePath));
+    applyWorkspaceState(await window.desktop.activateDocument(documentId));
   } catch {
     showNotice('The selected tab could not be activated.');
   }
 };
 
-const closeDocument = async (filePath: string): Promise<void> => {
-  const tab = tabsByFilePath.get(filePath);
-  const document = documentForPath(filePath);
+const languageForDocument = (document: OpenedDocument): string | null => {
+  const fileName = document.fileName.toLowerCase();
+  const language = monaco.languages.getLanguages().find((candidate) => {
+    if (candidate.filenames?.some((name) => name.toLowerCase() === fileName)) {
+      return true;
+    }
+
+    return candidate.extensions?.some((extension) => fileName.endsWith(extension.toLowerCase()));
+  });
+
+  return language?.id ?? null;
+};
+
+const updateModelLanguage = (document: OpenedDocument, tab: EditorTab): void => {
+  const language = languageForDocument(document);
+
+  if (language && tab.model.getLanguageId() !== language) {
+    monaco.editor.setModelLanguage(tab.model, language);
+  }
+};
+
+const saveDocument = async (documentId: string, saveAs = false): Promise<boolean> => {
+  const tab = tabsByDocumentId.get(documentId);
+
+  if (!tab) {
+    return false;
+  }
+
+  const contents = tab.model.getValue();
+  const savedAlternativeVersionId = tab.model.getAlternativeVersionId();
+
+  try {
+    const result = saveAs
+      ? await window.desktop.saveDocumentAs(documentId, contents)
+      : await window.desktop.saveDocument(documentId, contents);
+
+    if (result.kind === 'cancelled') {
+      return false;
+    }
+
+    if (result.kind === 'error') {
+      showNotice(result.message);
+      return false;
+    }
+
+    tab.savedAlternativeVersionId = savedAlternativeVersionId;
+    applyWorkspaceState(result.state);
+    hideNotice();
+    return true;
+  } catch {
+    showNotice('The document could not be saved.');
+    return false;
+  }
+};
+
+const saveActiveDocument = async (saveAs = false): Promise<void> => {
+  if (workspaceState.activeDocumentId) {
+    await saveDocument(workspaceState.activeDocumentId, saveAs);
+  }
+};
+
+const closeDocument = async (documentId: string): Promise<void> => {
+  const tab = tabsByDocumentId.get(documentId);
+  const document = documentForId(documentId);
 
   if (!tab || !document) {
     return;
   }
 
-  if (
-    isTabDirty(tab) &&
-    !window.confirm(`Close ${document.fileName}? Unsaved changes will be discarded.`)
-  ) {
-    return;
+  if (isTabDirty(tab)) {
+    let decision;
+
+    try {
+      decision = await window.desktop.confirmClose(documentId);
+    } catch {
+      showNotice('The close confirmation could not be shown.');
+      return;
+    }
+
+    if (decision === 'cancel') {
+      return;
+    }
+
+    if (decision === 'save') {
+      if (!(await saveDocument(documentId))) {
+        return;
+      }
+
+      const currentTab = tabsByDocumentId.get(documentId);
+
+      if (currentTab && isTabDirty(currentTab)) {
+        return;
+      }
+    }
   }
 
   try {
-    applyWorkspaceState(await window.desktop.closeDocument(filePath));
+    applyWorkspaceState(await window.desktop.closeDocument(documentId));
   } catch {
     showNotice('The tab could not be closed.');
   }
@@ -194,10 +291,10 @@ const closeDocument = async (filePath: string): Promise<void> => {
 
 const renderTabs = (): void => {
   const fragment = document.createDocumentFragment();
-  tabButtonsByFilePath.clear();
+  tabButtonsByDocumentId.clear();
 
   for (const document of workspaceState.documents) {
-    const tab = tabsByFilePath.get(document.filePath);
+    const tab = tabsByDocumentId.get(document.documentId);
     const tabItem = window.document.createElement('div');
     const selectButton = window.document.createElement('button');
     const fileName = window.document.createElement('span');
@@ -205,11 +302,11 @@ const renderTabs = (): void => {
     const closeButton = window.document.createElement('button');
 
     tabItem.className = 'tab';
-    tabItem.dataset['filePath'] = document.filePath;
+    tabItem.dataset['documentId'] = document.documentId;
 
     selectButton.className = 'tab__select';
     selectButton.type = 'button';
-    selectButton.title = document.filePath;
+    selectButton.title = document.filePath ?? document.fileName;
     selectButton.setAttribute('role', 'tab');
     selectButton.setAttribute('aria-controls', 'editor');
 
@@ -228,26 +325,26 @@ const renderTabs = (): void => {
 
     selectButton.addEventListener('pointerdown', (event) => {
       if (event.button === 0) {
-        activateTabLocally(document.filePath, false);
+        activateTabLocally(document.documentId, false);
       }
     });
     selectButton.addEventListener('click', () => {
-      void activateDocument(document.filePath);
+      void activateDocument(document.documentId);
     });
     selectButton.addEventListener('auxclick', (event) => {
       if (event.button === 1) {
         event.preventDefault();
-        void closeDocument(document.filePath);
+        void closeDocument(document.documentId);
       }
     });
     closeButton.addEventListener('click', () => {
-      void closeDocument(document.filePath);
+      void closeDocument(document.documentId);
     });
 
     selectButton.append(dirtyIndicator, fileName);
     tabItem.append(selectButton, closeButton);
     fragment.append(tabItem);
-    tabButtonsByFilePath.set(document.filePath, selectButton);
+    tabButtonsByDocumentId.set(document.documentId, selectButton);
 
     if (tab && isTabDirty(tab)) {
       tabItem.classList.add('tab--dirty');
@@ -259,37 +356,45 @@ const renderTabs = (): void => {
 };
 
 const createTab = (document: OpenedDocument): EditorTab => {
-  const model = monaco.editor.createModel(
-    document.contents,
-    undefined,
-    monaco.Uri.file(document.filePath),
-  );
-  const initialAlternativeVersionId = model.getAlternativeVersionId();
+  const uri = monaco.Uri.from({
+    authority: document.documentId,
+    path: `/${document.fileName}`,
+    scheme: 'winzig-document',
+  });
+  const model = monaco.editor.createModel(document.contents, 'plaintext', uri);
+  const savedAlternativeVersionId = model.getAlternativeVersionId();
   const contentListener = model.onDidChangeContent(() => {
     updateTabPresentation();
   });
 
-  return {
+  const tab = {
     contentListener,
-    initialAlternativeVersionId,
     model,
+    savedAlternativeVersionId,
     viewState: null,
   };
+
+  updateModelLanguage(document, tab);
+  return tab;
 };
 
 const applyWorkspaceState = (state: EditorWorkspaceState): void => {
-  saveViewState(workspaceState.activeFilePath);
+  saveViewState(workspaceState.activeDocumentId);
   workspaceState = state;
-  const openFilePaths = new Set(state.documents.map((document) => document.filePath));
+  const openDocumentIds = new Set(state.documents.map((document) => document.documentId));
 
   for (const document of state.documents) {
-    if (!tabsByFilePath.has(document.filePath)) {
-      tabsByFilePath.set(document.filePath, createTab(document));
+    const existingTab = tabsByDocumentId.get(document.documentId);
+
+    if (existingTab) {
+      updateModelLanguage(document, existingTab);
+    } else {
+      tabsByDocumentId.set(document.documentId, createTab(document));
     }
   }
 
-  for (const [filePath, tab] of tabsByFilePath) {
-    if (openFilePaths.has(filePath)) {
+  for (const [documentId, tab] of tabsByDocumentId) {
+    if (openDocumentIds.has(documentId)) {
       continue;
     }
 
@@ -299,13 +404,13 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
 
     tab.contentListener.dispose();
     tab.model.dispose();
-    tabsByFilePath.delete(filePath);
+    tabsByDocumentId.delete(documentId);
   }
 
   renderTabs();
 
-  if (state.activeFilePath && tabsByFilePath.has(state.activeFilePath)) {
-    activateTabLocally(state.activeFilePath);
+  if (state.activeDocumentId && tabsByDocumentId.has(state.activeDocumentId)) {
+    activateTabLocally(state.activeDocumentId);
   } else {
     editor.setModel(emptyModel);
     document.title = 'Winzig';
@@ -315,6 +420,10 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
     showNotice(`${state.error.message} ${state.error.filePath}`);
   } else {
     hideNotice();
+  }
+
+  if (quickSwitcherElement.open) {
+    renderQuickSwitcher();
   }
 };
 
@@ -326,19 +435,195 @@ const openFiles = async (): Promise<void> => {
   }
 };
 
-const activateRelativeTab = (offset: number): void => {
-  const filePaths = workspaceState.documents.map((document) => document.filePath);
+const createDocument = async (): Promise<void> => {
+  try {
+    applyWorkspaceState(await window.desktop.createDocument());
+  } catch {
+    showNotice('A new document could not be created.');
+  }
+};
 
-  if (filePaths.length === 0) {
+const reopenClosedDocument = async (): Promise<void> => {
+  try {
+    applyWorkspaceState(await window.desktop.reopenClosedDocument());
+  } catch {
+    showNotice('The closed tab could not be restored.');
+  }
+};
+
+const activateRelativeTab = (offset: number): void => {
+  const documentIds = workspaceState.documents.map((document) => document.documentId);
+
+  if (documentIds.length === 0) {
     return;
   }
 
-  const currentIndex = Math.max(0, filePaths.indexOf(workspaceState.activeFilePath ?? ''));
-  const nextIndex = (currentIndex + offset + filePaths.length) % filePaths.length;
-  const nextFilePath = filePaths[nextIndex];
+  const currentIndex = Math.max(0, documentIds.indexOf(workspaceState.activeDocumentId ?? ''));
+  const nextIndex = (currentIndex + offset + documentIds.length) % documentIds.length;
+  const nextDocumentId = documentIds[nextIndex];
 
-  if (nextFilePath) {
-    void activateDocument(nextFilePath);
+  if (nextDocumentId) {
+    void activateDocument(nextDocumentId);
+  }
+};
+
+const activateDocumentAtIndex = (requestedIndex: number): void => {
+  const index =
+    requestedIndex === 8
+      ? workspaceState.documents.length - 1
+      : Math.min(requestedIndex, workspaceState.documents.length - 1);
+  const document = workspaceState.documents[index];
+
+  if (document) {
+    void activateDocument(document.documentId);
+  }
+};
+
+const updateQuickSwitcherSelection = (nextSelection: number): void => {
+  const options =
+    quickSwitcherResults.querySelectorAll<HTMLButtonElement>('.quick-switcher__option');
+
+  if (options.length === 0) {
+    quickSwitcherSelection = 0;
+    return;
+  }
+
+  quickSwitcherSelection = (nextSelection + options.length) % options.length;
+
+  for (const [index, option] of [...options].entries()) {
+    const isSelected = index === quickSwitcherSelection;
+    option.classList.toggle('quick-switcher__option--selected', isSelected);
+    option.setAttribute('aria-selected', String(isSelected));
+
+    if (isSelected) {
+      option.scrollIntoView({ block: 'nearest' });
+    }
+  }
+};
+
+function renderQuickSwitcher(): void {
+  const query = quickSwitcherInput.value.trim().toLowerCase();
+  const matchingDocuments = workspaceState.documents.filter((document) => {
+    const searchableText = `${document.fileName} ${document.filePath ?? ''}`.toLowerCase();
+    return searchableText.includes(query);
+  });
+  const fragment = document.createDocumentFragment();
+
+  quickSwitcherDocumentIds = matchingDocuments.map((document) => document.documentId);
+  quickSwitcherSelection = 0;
+
+  for (const [index, document] of matchingDocuments.entries()) {
+    const option = window.document.createElement('button');
+    const name = window.document.createElement('span');
+    const path = window.document.createElement('span');
+
+    option.className = 'quick-switcher__option';
+    option.type = 'button';
+    option.setAttribute('role', 'option');
+    option.setAttribute('aria-selected', String(index === 0));
+
+    if (index === 0) {
+      option.classList.add('quick-switcher__option--selected');
+    }
+
+    name.className = 'quick-switcher__name';
+    name.textContent = document.fileName;
+    path.className = 'quick-switcher__path';
+    path.textContent = document.filePath ?? 'Unsaved file';
+
+    option.append(name, path);
+    option.addEventListener('pointermove', () => {
+      updateQuickSwitcherSelection(index);
+    });
+    option.addEventListener('click', () => {
+      quickSwitcherElement.close();
+      void activateDocument(document.documentId);
+    });
+    fragment.append(option);
+  }
+
+  if (matchingDocuments.length === 0) {
+    const emptyMessage = window.document.createElement('p');
+    emptyMessage.className = 'quick-switcher__empty';
+    emptyMessage.textContent = 'No matching open files';
+    fragment.append(emptyMessage);
+  }
+
+  quickSwitcherResults.replaceChildren(fragment);
+}
+
+const openQuickSwitcher = (): void => {
+  if (workspaceState.documents.length === 0) {
+    return;
+  }
+
+  quickSwitcherInput.value = '';
+  renderQuickSwitcher();
+
+  if (!quickSwitcherElement.open) {
+    quickSwitcherElement.showModal();
+  }
+
+  quickSwitcherInput.focus();
+};
+
+const toggleWordWrap = (): void => {
+  wordWrapEnabled = !wordWrapEnabled;
+  editor.updateOptions({
+    wordWrap: wordWrapEnabled ? 'on' : 'off',
+  });
+  editor.focus();
+};
+
+const runEditorCommand = (command: EditorCommand): void => {
+  if (command.startsWith('select-document-')) {
+    const index = Number(command.at(-1)) - 1;
+    activateDocumentAtIndex(index);
+    return;
+  }
+
+  switch (command) {
+    case 'close-active-document':
+      if (workspaceState.activeDocumentId) {
+        void closeDocument(workspaceState.activeDocumentId);
+      }
+      break;
+    case 'command-palette':
+      void editor.getAction('editor.action.quickCommand')?.run();
+      break;
+    case 'create-document':
+      void createDocument();
+      break;
+    case 'next-document':
+      activateRelativeTab(1);
+      break;
+    case 'open-files':
+      void openFiles();
+      break;
+    case 'previous-document':
+      activateRelativeTab(-1);
+      break;
+    case 'quick-switcher':
+      openQuickSwitcher();
+      break;
+    case 'redo':
+      editor.trigger('application-menu', 'redo', null);
+      break;
+    case 'reopen-closed-document':
+      void reopenClosedDocument();
+      break;
+    case 'save-document':
+      void saveActiveDocument();
+      break;
+    case 'save-document-as':
+      void saveActiveDocument(true);
+      break;
+    case 'toggle-word-wrap':
+      toggleWordWrap();
+      break;
+    case 'undo':
+      editor.trigger('application-menu', 'undo', null);
+      break;
   }
 };
 
@@ -357,18 +642,35 @@ const updateMotionPreferences = (): void => {
 openFilesButton.addEventListener('click', () => {
   void openFiles();
 });
-window.addEventListener('keydown', (event) => {
-  const primaryModifier = event.metaKey || event.ctrlKey;
-
-  if (primaryModifier && event.key.toLowerCase() === 'o') {
+quickSwitcherInput.addEventListener('input', renderQuickSwitcher);
+quickSwitcherInput.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
-    void openFiles();
+    updateQuickSwitcherSelection(quickSwitcherSelection + (event.key === 'ArrowDown' ? 1 : -1));
     return;
   }
 
-  if (event.ctrlKey && event.key === 'Tab') {
+  if (event.key === 'Enter') {
     event.preventDefault();
-    activateRelativeTab(event.shiftKey ? -1 : 1);
+    const documentId = quickSwitcherDocumentIds[quickSwitcherSelection];
+
+    if (documentId) {
+      quickSwitcherElement.close();
+      void activateDocument(documentId);
+    }
+  }
+});
+quickSwitcherElement.addEventListener('click', (event) => {
+  if (event.target === quickSwitcherElement) {
+    quickSwitcherElement.close();
+  }
+});
+window.addEventListener('keydown', (event) => {
+  const command = resolveKeyboardShortcut(event, shortcutPlatform);
+
+  if (command) {
+    event.preventDefault();
+    runEditorCommand(command);
   }
 });
 
@@ -376,6 +678,7 @@ darkMode.addEventListener('change', updateTheme);
 highContrast.addEventListener('change', updateTheme);
 reducedMotion.addEventListener('change', updateMotionPreferences);
 
+const disposeEditorCommandListener = window.desktop.onEditorCommand(runEditorCommand);
 const disposeWorkspaceStateListener = window.desktop.onWorkspaceStateChanged(applyWorkspaceState);
 
 const initializeEditor = async (): Promise<void> => {
@@ -387,18 +690,20 @@ const initializeEditor = async (): Promise<void> => {
 };
 
 window.addEventListener('beforeunload', () => {
+  disposeEditorCommandListener();
   disposeWorkspaceStateListener();
   darkMode.removeEventListener('change', updateTheme);
   highContrast.removeEventListener('change', updateTheme);
   reducedMotion.removeEventListener('change', updateMotionPreferences);
 
-  for (const tab of tabsByFilePath.values()) {
+  editor.dispose();
+
+  for (const tab of tabsByDocumentId.values()) {
     tab.contentListener.dispose();
     tab.model.dispose();
   }
 
   emptyModel.dispose();
-  editor.dispose();
 });
 
 void initializeEditor();

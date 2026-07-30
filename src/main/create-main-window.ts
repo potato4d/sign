@@ -13,7 +13,7 @@ export const createMainWindow = (ipcHandlers: AppIpcHandlers): BrowserWindow => 
   const trustedEntry = rendererUrl ?? APPLICATION_ENTRY;
   const workspaceState = ipcHandlers.getWorkspaceState();
   const activeDocument = workspaceState.documents.find(
-    (document) => document.filePath === workspaceState.activeFilePath,
+    (document) => document.documentId === workspaceState.activeDocumentId,
   );
 
   const mainWindow = new BrowserWindow({

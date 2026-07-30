@@ -16,7 +16,7 @@ future changes must preserve.
 
 ## Non-goals
 
-- A product domain model, file persistence, or unsaved-change workflow.
+- A product domain model or a project-wide workspace abstraction.
 - Remote content, external navigation, telemetry, or automatic updates.
 - A UI framework or general-purpose dependency injection container.
 - Release signing, notarization, or publication.
@@ -44,21 +44,36 @@ only from the expected window and its main frame.
 4. A serializable workspace state crosses the narrow preload bridge. It contains the ordered open
    documents, active path, and latest open error; the renderer never receives a generic file-read
    capability.
-5. Monaco creates one model per file whose URI is its absolute path, allowing language inference
-   from the file name.
+5. Monaco creates one model per document with a stable internal URI. Language mode is inferred from
+   the visible file name and updated after Save As without replacing the model.
 
 When open requests overlap, every unique document is retained, but only the newest request may take
 focus or replace the visible error state.
 
 ## Tab ownership
 
-- Main is the source of truth for tab order, the active file path, and close operations.
+- Main is the source of truth for document identity, tab order, the active document, file paths, and
+  close operations.
 - Renderer owns Monaco models and keeps their in-memory edits, cursor state, and undo history while
   tabs remain open.
 - Reopening an existing path activates its current model rather than replacing unsaved edits with a
   new disk read.
-- Renderer requests activation and closure only for paths already present in the workspace.
-- Closing a modified model requires an explicit discard confirmation.
+- Renderer requests activation, saving, and closure only for document identifiers already present
+  in the workspace.
+- Main writes only to a path that was explicitly opened or selected in a native save dialog.
+- Closing a modified model requires an explicit save, discard, or cancel decision.
+- Closed file-backed tabs are reloaded through the normal size and UTF-8 checks. Unsaved tabs reopen
+  from their last saved in-memory state.
+
+## Command routing
+
+- The native application menu defines desktop-level commands and their canonical accelerators.
+- Menu actions send an allowlisted command value through the preload bridge; arbitrary command names
+  are rejected.
+- Renderer key handling adds only platform-specific tab-navigation aliases and direct tab selection.
+- Monaco remains authoritative for text-editing bindings such as undo, search, replacement, folding,
+  comments, and multiple cursors.
+- Zoom and full-screen behavior use native Electron roles.
 
 ## Security invariants
 

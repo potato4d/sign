@@ -28,9 +28,30 @@ focuses its existing window and opens them as tabs.
 - Use the `+` button or <kbd>Command</kbd>/<kbd>Control</kbd>+<kbd>O</kbd> to select multiple files.
 - Select a tab to switch while keeping its Monaco model, cursor position, and undo history.
 - Use the close button or middle-click a tab to close it.
-- Use <kbd>Control</kbd>+<kbd>Tab</kbd> and
-  <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> to move between tabs.
-- Closing a modified tab requires confirmation because saving is not implemented yet.
+- Closing a modified tab offers to save, discard, or cancel.
+- Reopening a saved file reads its current contents from disk.
+
+## Keyboard shortcuts
+
+The application menu is the source of truth for desktop-level shortcuts. Monaco keeps its built-in
+editing bindings for undo, redo, search, replace, navigation, comments, folding, and multiple
+cursors.
+
+| Action                | macOS                                                                                                      | Windows / Linux                                                                             |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| New file              | <kbd>Command</kbd>+<kbd>N</kbd>                                                                            | <kbd>Control</kbd>+<kbd>N</kbd>                                                             |
+| Open files            | <kbd>Command</kbd>+<kbd>O</kbd>                                                                            | <kbd>Control</kbd>+<kbd>O</kbd>                                                             |
+| Save                  | <kbd>Command</kbd>+<kbd>S</kbd>                                                                            | <kbd>Control</kbd>+<kbd>S</kbd>                                                             |
+| Save as               | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>                                            |
+| Close current tab     | <kbd>Command</kbd>+<kbd>W</kbd>                                                                            | <kbd>Control</kbd>+<kbd>W</kbd>                                                             |
+| Reopen closed tab     | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>                                            |
+| Quick switcher        | <kbd>Command</kbd>+<kbd>P</kbd>                                                                            | <kbd>Control</kbd>+<kbd>P</kbd>                                                             |
+| Command palette       | <kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>                                                           | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>                                            |
+| Next tab              | <kbd>Control</kbd>+<kbd>Tab</kbd> or <kbd>Command</kbd>+<kbd>Option</kbd>+<kbd>Right</kbd>                 | <kbd>Control</kbd>+<kbd>Tab</kbd> or <kbd>Control</kbd>+<kbd>Page Down</kbd>                |
+| Previous tab          | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> or <kbd>Command</kbd>+<kbd>Option</kbd>+<kbd>Left</kbd> | <kbd>Control</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> or <kbd>Control</kbd>+<kbd>Page Up</kbd> |
+| Select tab 1–8 / last | <kbd>Command</kbd>+<kbd>1–8</kbd> / <kbd>Command</kbd>+<kbd>9</kbd>                                        | <kbd>Control</kbd>+<kbd>1–8</kbd> / <kbd>Control</kbd>+<kbd>9</kbd>                         |
+| Toggle word wrap      | <kbd>Option</kbd>+<kbd>Z</kbd>                                                                             | <kbd>Alt</kbd>+<kbd>Z</kbd>                                                                 |
+| Zoom in/out/reset     | <kbd>Command</kbd>+<kbd>=/-/0</kbd>                                                                        | <kbd>Control</kbd>+<kbd>=/-/0</kbd>                                                         |
 
 ## Commands
 
@@ -56,9 +77,9 @@ docs/
 The current runtime boundaries, security invariants, and source-of-truth rules live in
 [docs/architecture.md](docs/architecture.md).
 
-The editor opens UTF-8 regular files up to 20 MiB each. Editing is currently in-memory; tab switches
-preserve edits, while closing a modified tab confirms that the changes will be discarded. Saving is
-not implemented yet.
+The editor opens and saves UTF-8 regular files up to 20 MiB each. Tab switches preserve edits,
+cursor positions, and undo history. New files remain in memory until their first save, which opens a
+native save dialog.
 
 The packaged folder is intended for local verification. macOS packages receive an ad-hoc signature
 so they can run locally; trusted distribution signing and installer creation belong to a separate

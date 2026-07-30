@@ -1,8 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { DesktopApi, EditorWorkspaceState } from '../shared/desktop-api';
+import type {
+  CloseDecision,
+  DesktopApi,
+  DesktopPlatform,
+  DocumentSaveResult,
+  EditorCommand,
+  EditorWorkspaceState,
+} from '../shared/desktop-api';
 
-import { IPC_CHANNELS, isEditorWorkspaceState } from '../shared/desktop-api';
+import {
+  IPC_CHANNELS,
+  isCloseDecision,
+  isDocumentSaveResult,
+  isEditorCommand,
+  isEditorWorkspaceState,
+} from '../shared/desktop-api';
 
 const invokeWorkspaceState = async (
   channel: string,
@@ -17,11 +30,49 @@ const invokeWorkspaceState = async (
   return state;
 };
 
+const invokeSave = async (
+  channel: string,
+  documentId: string,
+  contents: string,
+): Promise<DocumentSaveResult> => {
+  const result: unknown = await ipcRenderer.invoke(channel, documentId, contents);
+
+  if (!isDocumentSaveResult(result)) {
+    throw new TypeError('The main process returned an invalid save result.');
+  }
+
+  return result;
+};
+
 const desktopApi: DesktopApi = Object.freeze({
-  activateDocument: (filePath: string) =>
-    invokeWorkspaceState(IPC_CHANNELS.activateDocument, filePath),
-  closeDocument: (filePath: string) => invokeWorkspaceState(IPC_CHANNELS.closeDocument, filePath),
+  activateDocument: (documentId: string) =>
+    invokeWorkspaceState(IPC_CHANNELS.activateDocument, documentId),
+  closeDocument: (documentId: string) =>
+    invokeWorkspaceState(IPC_CHANNELS.closeDocument, documentId),
+  confirmClose: async (documentId: string): Promise<CloseDecision> => {
+    const decision: unknown = await ipcRenderer.invoke(IPC_CHANNELS.confirmClose, documentId);
+
+    if (!isCloseDecision(decision)) {
+      throw new TypeError('The main process returned an invalid close decision.');
+    }
+
+    return decision;
+  },
+  createDocument: () => invokeWorkspaceState(IPC_CHANNELS.createDocument),
   getWorkspaceState: () => invokeWorkspaceState(IPC_CHANNELS.getWorkspaceState),
+  onEditorCommand: (listener: (command: EditorCommand) => void) => {
+    const handleCommand = (_event: Electron.IpcRendererEvent, command: unknown): void => {
+      if (isEditorCommand(command)) {
+        listener(command);
+      }
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.editorCommand, handleCommand);
+
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.editorCommand, handleCommand);
+    };
+  },
   onWorkspaceStateChanged: (listener: (state: EditorWorkspaceState) => void) => {
     const handleStateChanged = (_event: Electron.IpcRendererEvent, state: unknown): void => {
       if (isEditorWorkspaceState(state)) {
@@ -36,6 +87,14 @@ const desktopApi: DesktopApi = Object.freeze({
     };
   },
   openFiles: () => invokeWorkspaceState(IPC_CHANNELS.openFiles),
+  platform: (process.platform === 'darwin' || process.platform === 'win32'
+    ? process.platform
+    : 'linux') satisfies DesktopPlatform,
+  reopenClosedDocument: () => invokeWorkspaceState(IPC_CHANNELS.reopenClosedDocument),
+  saveDocument: (documentId: string, contents: string) =>
+    invokeSave(IPC_CHANNELS.saveDocument, documentId, contents),
+  saveDocumentAs: (documentId: string, contents: string) =>
+    invokeSave(IPC_CHANNELS.saveDocumentAs, documentId, contents),
 });
 
 contextBridge.exposeInMainWorld('desktop', desktopApi);

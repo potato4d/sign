@@ -1,12 +1,20 @@
-import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { join, resolve } from 'node:path';
 
 import { app, BrowserWindow, dialog, session } from 'electron';
 
-import type { EditorWorkspaceState } from '../shared/desktop-api';
+import type {
+  CloseDecision,
+  DocumentSaveResult,
+  EditorWorkspaceState,
+  OpenedDocument,
+} from '../shared/desktop-api';
 import type { AppIpcHandlers } from './ipc';
 
 import { IPC_CHANNELS } from '../shared/desktop-api';
+import { installApplicationMenu } from './application-menu';
 import { createMainWindow } from './create-main-window';
+import { writeDocumentFile } from './document-file';
 import {
   registerApplicationProtocol,
   registerApplicationScheme,
@@ -16,8 +24,11 @@ import { loadFile, resolveStartupFilePaths } from './startup-file';
 import {
   EMPTY_WORKSPACE_STATE,
   activateWorkspaceDocument,
+  addWorkspaceDocument,
   closeWorkspaceDocument,
   mergeFileResults,
+  restoreWorkspaceDocument,
+  updateSavedWorkspaceDocument,
 } from './workspace-state';
 
 registerApplicationScheme();
@@ -27,6 +38,17 @@ let workspaceState: EditorWorkspaceState = EMPTY_WORKSPACE_STATE;
 let mainWindow: BrowserWindow | null = null;
 let openingMainWindow: Promise<void> | null = null;
 let latestOpenRequestId = 0;
+let untitledDocumentNumber = 0;
+const closedDocuments: (
+  | {
+      readonly document: OpenedDocument;
+      readonly kind: 'untitled';
+    }
+  | {
+      readonly filePath: string;
+      readonly kind: 'file';
+    }
+)[] = [];
 let pendingFilePaths = [
   ...resolveStartupFilePaths({
     argv: process.argv,
@@ -47,7 +69,9 @@ const enqueuePendingFilePaths = (filePaths: readonly string[]): void => {
 };
 
 const activeDocument = (): EditorWorkspaceState['documents'][number] | undefined =>
-  workspaceState.documents.find((document) => document.filePath === workspaceState.activeFilePath);
+  workspaceState.documents.find(
+    (document) => document.documentId === workspaceState.activeDocumentId,
+  );
 
 const focusMainWindow = (): void => {
   if (!mainWindow) {
@@ -77,14 +101,24 @@ const publishWorkspaceState = (state: EditorWorkspaceState): EditorWorkspaceStat
 };
 
 const openFilePaths = async (filePaths: readonly string[]): Promise<EditorWorkspaceState> => {
-  const uniqueFilePaths = [...new Set(filePaths)];
+  const uniqueFilePaths = [...new Set(filePaths.map((filePath) => resolve(filePath)))];
 
   if (uniqueFilePaths.length === 0) {
     return workspaceState;
   }
 
   const requestId = ++latestOpenRequestId;
-  const results = await Promise.all(uniqueFilePaths.map((filePath) => loadFile(filePath)));
+  const results = await Promise.all(
+    uniqueFilePaths.map((filePath) => {
+      const existingDocument = workspaceState.documents.find(
+        (document) => document.filePath === filePath,
+      );
+
+      return existingDocument
+        ? Promise.resolve({ document: existingDocument, kind: 'document' } as const)
+        : loadFile(filePath);
+    }),
+  );
   const isLatestRequest = requestId === latestOpenRequestId;
 
   return publishWorkspaceState(
@@ -108,13 +142,198 @@ const openFilesWithDialog = async (): Promise<EditorWorkspaceState> => {
   return result.canceled ? workspaceState : openFilePaths(result.filePaths);
 };
 
+const createDocument = (): EditorWorkspaceState => {
+  untitledDocumentNumber += 1;
+
+  return publishWorkspaceState(
+    addWorkspaceDocument(workspaceState, {
+      contents: '',
+      documentId: randomUUID(),
+      fileName: `Untitled-${untitledDocumentNumber}`,
+      filePath: null,
+    }),
+  );
+};
+
+const closeDocument = (documentId: string): EditorWorkspaceState => {
+  const document = workspaceState.documents.find(
+    (candidate) => candidate.documentId === documentId,
+  );
+  const nextState = closeWorkspaceDocument(workspaceState, documentId);
+
+  if (document && nextState !== workspaceState) {
+    closedDocuments.push(
+      document.filePath
+        ? {
+            filePath: document.filePath,
+            kind: 'file',
+          }
+        : {
+            document,
+            kind: 'untitled',
+          },
+    );
+
+    if (closedDocuments.length > 20) {
+      closedDocuments.shift();
+    }
+  }
+
+  return publishWorkspaceState(nextState);
+};
+
+const reopenClosedDocument = async (): Promise<EditorWorkspaceState> => {
+  const closedDocument = closedDocuments.pop();
+
+  if (!closedDocument) {
+    return workspaceState;
+  }
+
+  if (closedDocument.kind === 'file') {
+    return openFilePaths([closedDocument.filePath]);
+  }
+
+  return publishWorkspaceState(restoreWorkspaceDocument(workspaceState, closedDocument.document));
+};
+
+const saveDocumentToPath = async (
+  documentId: string,
+  contents: string,
+  filePath: string,
+): Promise<DocumentSaveResult> => {
+  const document = workspaceState.documents.find(
+    (candidate) => candidate.documentId === documentId,
+  );
+
+  if (!document) {
+    return {
+      kind: 'error',
+      message: 'The document is no longer open.',
+      state: workspaceState,
+    };
+  }
+
+  const conflictingDocument = workspaceState.documents.find(
+    (candidate) =>
+      candidate.documentId !== documentId &&
+      candidate.filePath !== null &&
+      candidate.filePath === filePath,
+  );
+
+  if (conflictingDocument) {
+    return {
+      kind: 'error',
+      message: 'That file is already open in another tab.',
+      state: workspaceState,
+    };
+  }
+
+  const writeResult = await writeDocumentFile(filePath, contents);
+
+  if (writeResult.kind === 'error') {
+    return {
+      kind: 'error',
+      message: writeResult.message,
+      state: workspaceState,
+    };
+  }
+
+  return {
+    documentId,
+    kind: 'saved',
+    state: publishWorkspaceState(
+      updateSavedWorkspaceDocument(workspaceState, documentId, contents, filePath),
+    ),
+  };
+};
+
+const saveDocumentAs = async (
+  documentId: string,
+  contents: string,
+): Promise<DocumentSaveResult> => {
+  const document = workspaceState.documents.find(
+    (candidate) => candidate.documentId === documentId,
+  );
+
+  if (!document || !mainWindow) {
+    return {
+      kind: 'error',
+      message: 'The document is no longer available.',
+      state: workspaceState,
+    };
+  }
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: document.filePath ?? document.fileName,
+    title: 'Save File',
+  });
+
+  if (result.canceled || !result.filePath) {
+    return {
+      kind: 'cancelled',
+      state: workspaceState,
+    };
+  }
+
+  return saveDocumentToPath(documentId, contents, resolve(result.filePath));
+};
+
+const saveDocument = async (documentId: string, contents: string): Promise<DocumentSaveResult> => {
+  const document = workspaceState.documents.find(
+    (candidate) => candidate.documentId === documentId,
+  );
+
+  if (!document) {
+    return {
+      kind: 'error',
+      message: 'The document is no longer open.',
+      state: workspaceState,
+    };
+  }
+
+  return document.filePath
+    ? saveDocumentToPath(documentId, contents, document.filePath)
+    : saveDocumentAs(documentId, contents);
+};
+
+const confirmClose = async (documentId: string): Promise<CloseDecision> => {
+  if (!mainWindow) {
+    return 'cancel';
+  }
+
+  const document = workspaceState.documents.find(
+    (candidate) => candidate.documentId === documentId,
+  );
+
+  if (!document) {
+    return 'cancel';
+  }
+
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    buttons: ['Save', "Don't Save", 'Cancel'],
+    cancelId: 2,
+    defaultId: 0,
+    detail: 'Your changes will be lost if you do not save them.',
+    message: `Do you want to save the changes to ${document.fileName}?`,
+    noLink: true,
+    title: 'Unsaved Changes',
+    type: 'warning',
+  });
+
+  return response === 0 ? 'save' : response === 1 ? 'discard' : 'cancel';
+};
+
 const ipcHandlers: AppIpcHandlers = {
-  activateDocument: (filePath) =>
-    publishWorkspaceState(activateWorkspaceDocument(workspaceState, filePath)),
-  closeDocument: (filePath) =>
-    publishWorkspaceState(closeWorkspaceDocument(workspaceState, filePath)),
+  activateDocument: (documentId) =>
+    publishWorkspaceState(activateWorkspaceDocument(workspaceState, documentId)),
+  closeDocument,
+  confirmClose,
+  createDocument,
   getWorkspaceState: () => workspaceState,
   openFiles: openFilesWithDialog,
+  reopenClosedDocument,
+  saveDocument,
+  saveDocumentAs,
 };
 
 const openMainWindow = async (): Promise<void> => {
@@ -199,6 +418,7 @@ if (!hasSingleInstanceLock) {
   void app.whenReady().then(async () => {
     configureSessionSecurity(session.defaultSession);
     registerApplicationProtocol(join(__dirname, '../renderer'));
+    installApplicationMenu(() => mainWindow);
     await ensureMainWindow();
 
     app.on('activate', () => {

@@ -2,10 +2,11 @@ import { readFile, stat } from 'node:fs/promises';
 import { statSync } from 'node:fs';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
+import { randomUUID } from 'node:crypto';
 
 import type { FileOpenResult } from '../shared/desktop-api';
 
-const DEFAULT_MAXIMUM_FILE_SIZE = 20 * 1024 * 1024;
+import { MAXIMUM_FILE_SIZE } from './file-policy';
 
 interface ResolveStartupFileOptions {
   readonly argv: readonly string[];
@@ -70,7 +71,7 @@ const errorResult = (filePath: string, message: string): FileOpenResult => ({
 
 export const loadFile = async (
   filePath: string,
-  { maximumFileSize = DEFAULT_MAXIMUM_FILE_SIZE }: LoadEditorStateOptions = {},
+  { maximumFileSize = MAXIMUM_FILE_SIZE }: LoadEditorStateOptions = {},
 ): Promise<FileOpenResult> => {
   const absolutePath = path.resolve(filePath);
 
@@ -91,6 +92,7 @@ export const loadFile = async (
     return {
       document: {
         contents,
+        documentId: randomUUID(),
         fileName: path.basename(absolutePath),
         filePath: absolutePath,
       },

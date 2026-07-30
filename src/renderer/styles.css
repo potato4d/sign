@@ -19,6 +19,7 @@
   --notice-border: rgba(20, 24, 32, 0.14);
   --notice-text: #242933;
   --page: #ffffff;
+  --selection: #dbeafe;
   --tab-height: 2.25rem;
 }
 
@@ -199,6 +200,87 @@ button:focus-visible {
   display: none;
 }
 
+.quick-switcher {
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: min(28rem, calc(100vh - 4rem));
+  margin: 3.5rem auto auto;
+  padding: 0.5rem;
+  color: var(--chrome-text);
+  background: var(--active-tab);
+  border: 1px solid var(--chrome-border);
+  border-radius: 0.7rem;
+  box-shadow: 0 1.25rem 4rem rgba(23, 28, 38, 0.26);
+}
+
+.quick-switcher::backdrop {
+  background: rgba(12, 16, 24, 0.2);
+}
+
+.quick-switcher__input {
+  width: 100%;
+  height: 2.4rem;
+  padding: 0 0.7rem;
+  color: var(--chrome-text);
+  background: var(--page);
+  border: 1px solid var(--chrome-border);
+  border-radius: 0.45rem;
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.quick-switcher__input:focus {
+  border-color: Highlight;
+  box-shadow: 0 0 0 1px Highlight;
+}
+
+.quick-switcher__results {
+  max-height: 22rem;
+  margin-top: 0.45rem;
+  overflow-y: auto;
+}
+
+.quick-switcher__option {
+  display: grid;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  color: var(--chrome-text);
+  background: transparent;
+  border: 0;
+  border-radius: 0.4rem;
+  cursor: default;
+  text-align: left;
+}
+
+.quick-switcher__option--selected {
+  background: var(--selection);
+}
+
+.quick-switcher__name {
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-switcher__path {
+  overflow: hidden;
+  margin-top: 0.1rem;
+  color: var(--chrome-text-muted);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-switcher__empty {
+  margin: 0;
+  padding: 1rem 0.65rem;
+  color: var(--chrome-text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --active-tab: #1e1e1e;
@@ -212,10 +294,15 @@ button:focus-visible {
     --notice-border: rgba(255, 255, 255, 0.16);
     --notice-text: #f1f3f7;
     --page: #1e1e1e;
+    --selection: #243b5a;
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
+  .quick-switcher::backdrop {
+    background: rgba(12, 16, 24, 0.45);
+  }
+
   .notice {
     background: var(--page);
     backdrop-filter: none;
@@ -231,5 +318,10 @@ button:focus-visible {
   .notice {
     border-color: currentColor;
     box-shadow: none;
+  }
+
+  .quick-switcher,
+  .quick-switcher__input {
+    border-color: currentColor;
   }
 }

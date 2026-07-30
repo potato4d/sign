@@ -1,7 +1,7 @@
-import type { EditorWorkspaceState, FileOpenResult } from '../shared/desktop-api';
+import type { EditorWorkspaceState, FileOpenResult, OpenedDocument } from '../shared/desktop-api';
 
 export const EMPTY_WORKSPACE_STATE: EditorWorkspaceState = {
-  activeFilePath: null,
+  activeDocumentId: null,
   documents: [],
   error: null,
 };
@@ -17,7 +17,7 @@ export const mergeFileResults = (
   { activateNewest, updateError }: MergeFileResultsOptions,
 ): EditorWorkspaceState => {
   const documents = [...state.documents];
-  let latestSuccessfulPath: string | null = null;
+  let latestSuccessfulDocumentId: string | null = null;
   let latestError = state.error;
 
   for (const result of results) {
@@ -32,27 +32,41 @@ export const mergeFileResults = (
       continue;
     }
 
-    const existingIndex = documents.findIndex(
-      (document) => document.filePath === result.document.filePath,
-    );
+    const existingIndex = documents.findIndex((document) => {
+      if (result.document.filePath) {
+        return document.filePath === result.document.filePath;
+      }
+
+      return document.documentId === result.document.documentId;
+    });
 
     if (existingIndex === -1) {
       documents.push(result.document);
+      latestSuccessfulDocumentId = result.document.documentId;
     } else {
-      documents[existingIndex] = result.document;
-    }
+      const existingDocument = documents[existingIndex];
 
-    latestSuccessfulPath = result.document.filePath;
+      if (!existingDocument) {
+        continue;
+      }
+
+      documents[existingIndex] = {
+        ...result.document,
+        documentId: existingDocument.documentId,
+      };
+      latestSuccessfulDocumentId = existingDocument.documentId;
+    }
 
     if (updateError) {
       latestError = null;
     }
   }
 
-  const shouldActivate = latestSuccessfulPath && (activateNewest || state.activeFilePath === null);
+  const shouldActivate =
+    latestSuccessfulDocumentId && (activateNewest || state.activeDocumentId === null);
 
   return {
-    activeFilePath: shouldActivate ? latestSuccessfulPath : state.activeFilePath,
+    activeDocumentId: shouldActivate ? latestSuccessfulDocumentId : state.activeDocumentId,
     documents,
     error: latestError,
   };
@@ -60,39 +74,99 @@ export const mergeFileResults = (
 
 export const activateWorkspaceDocument = (
   state: EditorWorkspaceState,
-  filePath: string,
+  documentId: string,
 ): EditorWorkspaceState => {
-  if (!state.documents.some((document) => document.filePath === filePath)) {
+  if (!state.documents.some((document) => document.documentId === documentId)) {
     return state;
   }
 
   return {
     ...state,
-    activeFilePath: filePath,
+    activeDocumentId: documentId,
   };
 };
 
 export const closeWorkspaceDocument = (
   state: EditorWorkspaceState,
-  filePath: string,
+  documentId: string,
 ): EditorWorkspaceState => {
-  const closingIndex = state.documents.findIndex((document) => document.filePath === filePath);
+  const closingIndex = state.documents.findIndex((document) => document.documentId === documentId);
 
   if (closingIndex === -1) {
     return state;
   }
 
-  const documents = state.documents.filter((document) => document.filePath !== filePath);
-  let activeFilePath = state.activeFilePath;
+  const closingDocument = state.documents[closingIndex];
+  const documents = state.documents.filter((document) => document.documentId !== documentId);
+  let activeDocumentId = state.activeDocumentId;
 
-  if (activeFilePath === filePath) {
-    activeFilePath =
-      documents[closingIndex]?.filePath ?? documents[closingIndex - 1]?.filePath ?? null;
+  if (activeDocumentId === documentId) {
+    activeDocumentId =
+      documents[closingIndex]?.documentId ?? documents[closingIndex - 1]?.documentId ?? null;
   }
 
   return {
-    activeFilePath,
+    activeDocumentId,
     documents,
-    error: state.error?.filePath === filePath ? null : state.error,
+    error:
+      closingDocument?.filePath && state.error?.filePath === closingDocument.filePath
+        ? null
+        : state.error,
+  };
+};
+
+export const addWorkspaceDocument = (
+  state: EditorWorkspaceState,
+  document: OpenedDocument,
+): EditorWorkspaceState => ({
+  activeDocumentId: document.documentId,
+  documents: [...state.documents, document],
+  error: null,
+});
+
+export const restoreWorkspaceDocument = (
+  state: EditorWorkspaceState,
+  document: OpenedDocument,
+): EditorWorkspaceState => {
+  const existingDocument = document.filePath
+    ? state.documents.find((candidate) => candidate.filePath === document.filePath)
+    : undefined;
+
+  if (existingDocument) {
+    return activateWorkspaceDocument(state, existingDocument.documentId);
+  }
+
+  if (state.documents.some((candidate) => candidate.documentId === document.documentId)) {
+    return activateWorkspaceDocument(state, document.documentId);
+  }
+
+  return addWorkspaceDocument(state, document);
+};
+
+export const updateSavedWorkspaceDocument = (
+  state: EditorWorkspaceState,
+  documentId: string,
+  contents: string,
+  filePath?: string,
+): EditorWorkspaceState => {
+  const documentIndex = state.documents.findIndex((document) => document.documentId === documentId);
+  const document = state.documents[documentIndex];
+
+  if (!document) {
+    return state;
+  }
+
+  const documents = [...state.documents];
+  documents[documentIndex] = {
+    ...document,
+    contents,
+    fileName: filePath ? filePath.split(/[\\/]/).at(-1) || filePath : document.fileName,
+    filePath: filePath ?? document.filePath,
+  };
+
+  return {
+    ...state,
+    documents,
+    error: null,
   };
 };

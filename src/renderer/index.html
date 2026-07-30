@@ -24,6 +24,23 @@
       </button>
     </header>
     <main id="editor" aria-label="Text editor"></main>
+    <dialog id="quick-switcher" class="quick-switcher" aria-label="Quick switcher">
+      <input
+        id="quick-switcher-input"
+        class="quick-switcher__input"
+        type="search"
+        placeholder="Switch to an open file"
+        aria-label="Filter open files"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <div
+        id="quick-switcher-results"
+        class="quick-switcher__results"
+        role="listbox"
+        aria-label="Open files"
+      ></div>
+    </dialog>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
   </body>
 </html>
