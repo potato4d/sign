@@ -72,7 +72,7 @@ button:focus-visible {
 }
 
 .platform-darwin .tab-bar {
-  padding-left: 4.5rem;
+  padding-left: calc(4.5rem + 10px);
 }
 
 .tab-list {
