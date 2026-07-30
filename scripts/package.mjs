@@ -88,7 +88,7 @@ try {
 
   const applicationPaths = await packager({
     afterInitialize: [applySecurityFuses],
-    appBundleId: 'app.winzig.desktop',
+    appBundleId: 'me.potato4d.winzig',
     asar: true,
     dir: stagingDirectory,
     electronVersion,
