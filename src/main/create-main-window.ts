@@ -6,12 +6,15 @@ import { APPLICATION_ENTRY } from './application-protocol';
 import { registerAppIpc } from './ipc';
 import { hardenWindowNavigation } from './security';
 
-import type { EditorState } from '../shared/desktop-api';
+import type { AppIpcHandlers } from './ipc';
 
-export const createMainWindow = (getEditorState: () => EditorState): BrowserWindow => {
+export const createMainWindow = (ipcHandlers: AppIpcHandlers): BrowserWindow => {
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   const trustedEntry = rendererUrl ?? APPLICATION_ENTRY;
-  const editorState = getEditorState();
+  const workspaceState = ipcHandlers.getWorkspaceState();
+  const activeDocument = workspaceState.documents.find(
+    (document) => document.filePath === workspaceState.activeFilePath,
+  );
 
   const mainWindow = new BrowserWindow({
     width: 1080,
@@ -19,7 +22,7 @@ export const createMainWindow = (getEditorState: () => EditorState): BrowserWind
     minWidth: 560,
     minHeight: 360,
     show: false,
-    title: editorState.kind === 'document' ? `${editorState.document.fileName} — Winzig` : 'Winzig',
+    title: activeDocument ? `${activeDocument.fileName} — Winzig` : 'Winzig',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -34,7 +37,7 @@ export const createMainWindow = (getEditorState: () => EditorState): BrowserWind
   });
 
   hardenWindowNavigation(mainWindow, trustedEntry);
-  const disposeIpc = registerAppIpc(mainWindow, getEditorState);
+  const disposeIpc = registerAppIpc(mainWindow, ipcHandlers);
 
   mainWindow.once('closed', disposeIpc);
   mainWindow.once('ready-to-show', () => {

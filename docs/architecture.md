@@ -9,7 +9,7 @@ future changes must preserve.
 - Keep privileged Electron capabilities out of browser-rendered code.
 - Make each cross-process capability explicit, typed, and small.
 - Fill the renderer with a focused Monaco editing surface.
-- Open an explicitly supplied startup file without exposing filesystem APIs to the renderer.
+- Open explicitly supplied files as tabs without exposing filesystem APIs to the renderer.
 - Deny navigation, new windows, embedded web views, and permissions by default.
 - Keep development and verification commands discoverable from `package.json`.
 - Add product-specific layers only when a concrete feature requires them.
@@ -36,17 +36,29 @@ only from the expected window and its main frame.
 
 ## Startup file flow
 
-1. The main process resolves the first command-line argument that points to an existing regular
+1. The main process resolves every unique command-line argument that points to an existing regular
    file. In development it skips the Electron application entry and command switches.
-2. macOS `open-file` events enter the same flow. A second application launch forwards its file to
-   the existing window.
-3. The main process reads at most 20 MiB of valid UTF-8 text.
-4. A serializable editor state crosses the narrow preload bridge. The renderer never receives a
-   generic file-read capability.
-5. Monaco creates a model whose URI is the absolute file path, allowing language inference from the
-   file name.
+2. macOS `open-file` events, second application launches, and the native multi-file dialog enter the
+   same loading flow.
+3. The main process reads at most 20 MiB of valid UTF-8 text per file.
+4. A serializable workspace state crosses the narrow preload bridge. It contains the ordered open
+   documents, active path, and latest open error; the renderer never receives a generic file-read
+   capability.
+5. Monaco creates one model per file whose URI is its absolute path, allowing language inference
+   from the file name.
 
-When multiple open requests overlap, only the newest completed request may update the editor.
+When open requests overlap, every unique document is retained, but only the newest request may take
+focus or replace the visible error state.
+
+## Tab ownership
+
+- Main is the source of truth for tab order, the active file path, and close operations.
+- Renderer owns Monaco models and keeps their in-memory edits, cursor state, and undo history while
+  tabs remain open.
+- Reopening an existing path activates its current model rather than replacing unsaved edits with a
+  new disk read.
+- Renderer requests activation and closure only for paths already present in the workspace.
+- Closing a modified model requires an explicit discard confirmation.
 
 ## Security invariants
 
@@ -74,6 +86,7 @@ Any change that relaxes an invariant must update the code, tests, and this docum
 | Runtime behavior             | `src/` and its tests                   |
 | Process contracts            | `src/shared/desktop-api.ts`            |
 | Startup file policy          | `src/main/startup-file.ts`             |
+| Tab state transitions        | `src/main/workspace-state.ts`          |
 | Tool versions                | `package.json` and `package-lock.json` |
 | Verification commands        | `package.json` scripts                 |
 | Packaging and security fuses | `scripts/package.mjs`                  |

@@ -1,48 +1,50 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadEditorState, resolveStartupFilePath } from './startup-file';
+import { loadFile, resolveStartupFilePaths } from './startup-file';
 
-describe('resolveStartupFilePath', () => {
+describe('resolveStartupFilePaths', () => {
   const existingFile = '/workspace/notes/example.ts';
-  const isFile = (candidate: string): boolean => candidate === existingFile;
+  const secondFile = '/workspace/notes/example.json';
+  const isFile = (candidate: string): boolean =>
+    candidate === existingFile || candidate === secondFile;
 
-  it('finds a packaged application file argument', () => {
+  it('finds packaged application file arguments in order', () => {
     expect(
-      resolveStartupFilePath({
-        argv: ['/Applications/Winzig', existingFile],
+      resolveStartupFilePaths({
+        argv: ['/Applications/Winzig', existingFile, secondFile, existingFile],
         cwd: '/workspace',
         isFile,
         isPackaged: true,
       }),
-    ).toBe(existingFile);
+    ).toEqual([existingFile, secondFile]);
   });
 
   it('skips the development entry and Electron switches', () => {
     expect(
-      resolveStartupFilePath({
+      resolveStartupFilePaths({
         argv: ['/path/to/electron', '.', '--inspect=5858', '--', 'notes/example.ts'],
         cwd: '/workspace',
         isFile,
         isPackaged: false,
       }),
-    ).toBe(existingFile);
+    ).toEqual([existingFile]);
   });
 
-  it('returns null when no regular file was provided', () => {
+  it('returns an empty list when no regular file was provided', () => {
     expect(
-      resolveStartupFilePath({
+      resolveStartupFilePaths({
         argv: ['/Applications/Winzig', '--no-sandbox', '/workspace/missing.ts'],
         cwd: '/workspace',
         isFile,
         isPackaged: true,
       }),
-    ).toBeNull();
+    ).toEqual([]);
   });
 });
 
-describe('loadEditorState', () => {
+describe('loadFile', () => {
   it('loads UTF-8 text into a serializable editor document', async () => {
-    const state = await loadEditorState(import.meta.filename);
+    const state = await loadFile(import.meta.filename);
 
     expect(state.kind).toBe('document');
 
@@ -53,7 +55,7 @@ describe('loadEditorState', () => {
   });
 
   it('rejects a file above the configured size limit', async () => {
-    const state = await loadEditorState(import.meta.filename, { maximumFileSize: 1 });
+    const state = await loadFile(import.meta.filename, { maximumFileSize: 1 });
 
     expect(state).toMatchObject({
       kind: 'error',

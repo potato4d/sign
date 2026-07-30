@@ -1,8 +1,9 @@
 import { join } from 'node:path';
 
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, dialog, session } from 'electron';
 
-import type { EditorState } from '../shared/desktop-api';
+import type { EditorWorkspaceState } from '../shared/desktop-api';
+import type { AppIpcHandlers } from './ipc';
 
 import { IPC_CHANNELS } from '../shared/desktop-api';
 import { createMainWindow } from './create-main-window';
@@ -11,20 +12,42 @@ import {
   registerApplicationScheme,
 } from './register-application-protocol';
 import { configureSessionSecurity } from './security';
-import { loadEditorState, resolveStartupFilePath } from './startup-file';
+import { loadFile, resolveStartupFilePaths } from './startup-file';
+import {
+  EMPTY_WORKSPACE_STATE,
+  activateWorkspaceDocument,
+  closeWorkspaceDocument,
+  mergeFileResults,
+} from './workspace-state';
 
 registerApplicationScheme();
 app.enableSandbox();
 
-let editorState: EditorState = { kind: 'empty' };
+let workspaceState: EditorWorkspaceState = EMPTY_WORKSPACE_STATE;
 let mainWindow: BrowserWindow | null = null;
 let openingMainWindow: Promise<void> | null = null;
-let openRequestId = 0;
-let pendingFilePath = resolveStartupFilePath({
-  argv: process.argv,
-  cwd: process.cwd(),
-  isPackaged: app.isPackaged,
-});
+let latestOpenRequestId = 0;
+let pendingFilePaths = [
+  ...resolveStartupFilePaths({
+    argv: process.argv,
+    cwd: process.cwd(),
+    isPackaged: app.isPackaged,
+  }),
+];
+
+const enqueuePendingFilePaths = (filePaths: readonly string[]): void => {
+  const pending = new Set(pendingFilePaths);
+
+  for (const filePath of filePaths) {
+    if (!pending.has(filePath)) {
+      pending.add(filePath);
+      pendingFilePaths.push(filePath);
+    }
+  }
+};
+
+const activeDocument = (): EditorWorkspaceState['documents'][number] | undefined =>
+  workspaceState.documents.find((document) => document.filePath === workspaceState.activeFilePath);
 
 const focusMainWindow = (): void => {
   if (!mainWindow) {
@@ -38,26 +61,60 @@ const focusMainWindow = (): void => {
   mainWindow.focus();
 };
 
-const publishEditorState = (state: EditorState): void => {
-  editorState = state;
+const publishWorkspaceState = (state: EditorWorkspaceState): EditorWorkspaceState => {
+  workspaceState = state;
 
   if (!mainWindow || mainWindow.isDestroyed()) {
-    return;
+    return workspaceState;
   }
 
-  const title = state.kind === 'document' ? `${state.document.fileName} — Winzig` : 'Winzig';
+  const document = activeDocument();
 
-  mainWindow.setTitle(title);
-  mainWindow.webContents.send(IPC_CHANNELS.editorStateChanged, state);
+  mainWindow.setTitle(document ? `${document.fileName} — Winzig` : 'Winzig');
+  mainWindow.webContents.send(IPC_CHANNELS.workspaceStateChanged, workspaceState);
+
+  return workspaceState;
 };
 
-const openFile = async (filePath: string): Promise<void> => {
-  const requestId = ++openRequestId;
-  const state = await loadEditorState(filePath);
+const openFilePaths = async (filePaths: readonly string[]): Promise<EditorWorkspaceState> => {
+  const uniqueFilePaths = [...new Set(filePaths)];
 
-  if (requestId === openRequestId) {
-    publishEditorState(state);
+  if (uniqueFilePaths.length === 0) {
+    return workspaceState;
   }
+
+  const requestId = ++latestOpenRequestId;
+  const results = await Promise.all(uniqueFilePaths.map((filePath) => loadFile(filePath)));
+  const isLatestRequest = requestId === latestOpenRequestId;
+
+  return publishWorkspaceState(
+    mergeFileResults(workspaceState, results, {
+      activateNewest: isLatestRequest,
+      updateError: isLatestRequest,
+    }),
+  );
+};
+
+const openFilesWithDialog = async (): Promise<EditorWorkspaceState> => {
+  if (!mainWindow) {
+    return workspaceState;
+  }
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile', 'multiSelections'],
+    title: 'Open Files',
+  });
+
+  return result.canceled ? workspaceState : openFilePaths(result.filePaths);
+};
+
+const ipcHandlers: AppIpcHandlers = {
+  activateDocument: (filePath) =>
+    publishWorkspaceState(activateWorkspaceDocument(workspaceState, filePath)),
+  closeDocument: (filePath) =>
+    publishWorkspaceState(closeWorkspaceDocument(workspaceState, filePath)),
+  getWorkspaceState: () => workspaceState,
+  openFiles: openFilesWithDialog,
 };
 
 const openMainWindow = async (): Promise<void> => {
@@ -66,22 +123,20 @@ const openMainWindow = async (): Promise<void> => {
     return;
   }
 
-  const filePath = pendingFilePath;
-  pendingFilePath = null;
+  const initialFilePaths = pendingFilePaths;
+  pendingFilePaths = [];
 
-  if (filePath) {
-    await openFile(filePath);
-  }
+  await openFilePaths(initialFilePaths);
 
-  mainWindow = createMainWindow(() => editorState);
+  mainWindow = createMainWindow(ipcHandlers);
   mainWindow.once('closed', () => {
     mainWindow = null;
   });
 
-  if (pendingFilePath) {
-    const laterFilePath = pendingFilePath;
-    pendingFilePath = null;
-    await openFile(laterFilePath);
+  if (pendingFilePaths.length > 0) {
+    const laterFilePaths = pendingFilePaths;
+    pendingFilePaths = [];
+    await openFilePaths(laterFilePaths);
   }
 };
 
@@ -97,7 +152,7 @@ app.on('open-file', (event, filePath) => {
   event.preventDefault();
 
   if (!app.isReady() || !mainWindow) {
-    pendingFilePath = filePath;
+    enqueuePendingFilePaths([filePath]);
 
     if (app.isReady()) {
       void ensureMainWindow();
@@ -106,7 +161,7 @@ app.on('open-file', (event, filePath) => {
     return;
   }
 
-  void openFile(filePath).then(focusMainWindow);
+  void openFilePaths([filePath]).then(focusMainWindow);
 });
 
 app.on('web-contents-created', (_event, webContents) => {
@@ -121,17 +176,24 @@ if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv, workingDirectory) => {
-    const filePath = resolveStartupFilePath({
+    const filePaths = resolveStartupFilePaths({
       argv,
       cwd: workingDirectory,
       isPackaged: app.isPackaged,
     });
 
-    if (filePath) {
-      void openFile(filePath).then(focusMainWindow);
-    } else {
+    if (filePaths.length === 0) {
       focusMainWindow();
+      return;
     }
+
+    if (!mainWindow) {
+      enqueuePendingFilePaths(filePaths);
+      void ensureMainWindow();
+      return;
+    }
+
+    void openFilePaths(filePaths).then(focusMainWindow);
   });
 
   void app.whenReady().then(async () => {

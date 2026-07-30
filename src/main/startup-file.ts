@@ -3,7 +3,7 @@ import { statSync } from 'node:fs';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 
-import type { EditorState } from '../shared/desktop-api';
+import type { FileOpenResult } from '../shared/desktop-api';
 
 const DEFAULT_MAXIMUM_FILE_SIZE = 20 * 1024 * 1024;
 
@@ -26,13 +26,15 @@ const isRegularFile = (candidate: string): boolean => {
   }
 };
 
-export const resolveStartupFilePath = ({
+export const resolveStartupFilePaths = ({
   argv,
   cwd,
   isFile = isRegularFile,
   isPackaged,
-}: ResolveStartupFileOptions): string | null => {
+}: ResolveStartupFileOptions): readonly string[] => {
   const applicationDirectory = path.resolve(cwd);
+  const filePaths: string[] = [];
+  const seenFilePaths = new Set<string>();
   let reachedArgumentSeparator = false;
 
   for (const argument of argv.slice(1)) {
@@ -51,35 +53,36 @@ export const resolveStartupFilePath = ({
       continue;
     }
 
-    if (isFile(candidate)) {
-      return candidate;
+    if (isFile(candidate) && !seenFilePaths.has(candidate)) {
+      seenFilePaths.add(candidate);
+      filePaths.push(candidate);
     }
   }
 
-  return null;
+  return filePaths;
 };
 
-const errorState = (filePath: string, message: string): EditorState => ({
+const errorResult = (filePath: string, message: string): FileOpenResult => ({
   filePath,
   kind: 'error',
   message,
 });
 
-export const loadEditorState = async (
+export const loadFile = async (
   filePath: string,
   { maximumFileSize = DEFAULT_MAXIMUM_FILE_SIZE }: LoadEditorStateOptions = {},
-): Promise<EditorState> => {
+): Promise<FileOpenResult> => {
   const absolutePath = path.resolve(filePath);
 
   try {
     const metadata = await stat(absolutePath);
 
     if (!metadata.isFile()) {
-      return errorState(absolutePath, 'The requested path is not a regular file.');
+      return errorResult(absolutePath, 'The requested path is not a regular file.');
     }
 
     if (metadata.size > maximumFileSize) {
-      return errorState(absolutePath, 'The file is too large to open safely.');
+      return errorResult(absolutePath, 'The file is too large to open safely.');
     }
 
     const bytes = await readFile(absolutePath);
@@ -99,6 +102,6 @@ export const loadEditorState = async (
         ? 'The file is not valid UTF-8 text.'
         : 'The file could not be opened.';
 
-    return errorState(absolutePath, message);
+    return errorResult(absolutePath, message);
   }
 };
