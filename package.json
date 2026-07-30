@@ -2,6 +2,7 @@
   "name": "winzig",
   "productName": "Winzig",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "A secure Electron and TypeScript desktop application foundation.",
   "main": "./out/main/index.js",
   "private": true,
