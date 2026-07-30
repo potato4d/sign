@@ -11,6 +11,7 @@ const projectDirectory = process.cwd();
 const manifestPath = path.join(projectDirectory, 'package.json');
 const outputDirectory = path.join(projectDirectory, 'release');
 const stagingDirectory = await mkdtemp(path.join(tmpdir(), 'winzig-package-'));
+const thirdPartyLicenseDirectory = path.join(stagingDirectory, 'third-party-licenses');
 const execFileAsync = promisify(execFile);
 
 const extractedExecutablePathFor = (buildPath, platform) => {
@@ -65,6 +66,25 @@ try {
     `${JSON.stringify(runtimeManifest, null, 2)}\n`,
     'utf8',
   );
+  await mkdir(thirdPartyLicenseDirectory, { recursive: true });
+  await Promise.all([
+    cp(
+      path.join(projectDirectory, 'node_modules/monaco-editor/LICENSE'),
+      path.join(thirdPartyLicenseDirectory, 'monaco-editor-LICENSE.txt'),
+    ),
+    cp(
+      path.join(projectDirectory, 'node_modules/monaco-editor/ThirdPartyNotices.txt'),
+      path.join(thirdPartyLicenseDirectory, 'monaco-editor-ThirdPartyNotices.txt'),
+    ),
+    cp(
+      path.join(projectDirectory, 'node_modules/dompurify/LICENSE'),
+      path.join(thirdPartyLicenseDirectory, 'dompurify-LICENSE.txt'),
+    ),
+    cp(
+      path.join(projectDirectory, 'node_modules/marked/LICENSE.md'),
+      path.join(thirdPartyLicenseDirectory, 'marked-LICENSE.md'),
+    ),
+  ]);
 
   const applicationPaths = await packager({
     afterInitialize: [applySecurityFuses],

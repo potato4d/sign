@@ -6,18 +6,21 @@ import { APPLICATION_ENTRY } from './application-protocol';
 import { registerAppIpc } from './ipc';
 import { hardenWindowNavigation } from './security';
 
-export const createMainWindow = (): BrowserWindow => {
+import type { EditorState } from '../shared/desktop-api';
+
+export const createMainWindow = (getEditorState: () => EditorState): BrowserWindow => {
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   const trustedEntry = rendererUrl ?? APPLICATION_ENTRY;
+  const editorState = getEditorState();
 
   const mainWindow = new BrowserWindow({
-    width: 960,
-    height: 680,
-    minWidth: 720,
-    minHeight: 520,
+    width: 1080,
+    height: 760,
+    minWidth: 560,
+    minHeight: 360,
     show: false,
-    title: 'Winzig',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#11141a' : '#eef1f7',
+    title: editorState.kind === 'document' ? `${editorState.document.fileName} — Winzig` : 'Winzig',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       allowRunningInsecureContent: false,
@@ -31,7 +34,7 @@ export const createMainWindow = (): BrowserWindow => {
   });
 
   hardenWindowNavigation(mainWindow, trustedEntry);
-  const disposeIpc = registerAppIpc(mainWindow);
+  const disposeIpc = registerAppIpc(mainWindow, getEditorState);
 
   mainWindow.once('closed', disposeIpc);
   mainWindow.once('ready-to-show', () => {

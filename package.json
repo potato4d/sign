@@ -10,6 +10,9 @@
     "npm": ">=11"
   },
   "packageManager": "npm@11.11.0",
+  "overrides": {
+    "dompurify": "3.4.12"
+  },
   "scripts": {
     "start": "electron-vite dev",
     "preview": "electron-vite preview",
@@ -36,7 +39,10 @@
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.65.0",
-    "vitest": "4.1.10",
-    "vite": "7.3.6"
+    "vite": "7.3.6",
+    "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "monaco-editor": "0.56.0"
   }
 }

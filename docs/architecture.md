@@ -8,13 +8,15 @@ future changes must preserve.
 
 - Keep privileged Electron capabilities out of browser-rendered code.
 - Make each cross-process capability explicit, typed, and small.
+- Fill the renderer with a focused Monaco editing surface.
+- Open an explicitly supplied startup file without exposing filesystem APIs to the renderer.
 - Deny navigation, new windows, embedded web views, and permissions by default.
 - Keep development and verification commands discoverable from `package.json`.
 - Add product-specific layers only when a concrete feature requires them.
 
 ## Non-goals
 
-- A product domain model or persistence layer.
+- A product domain model, file persistence, or unsaved-change workflow.
 - Remote content, external navigation, telemetry, or automatic updates.
 - A UI framework or general-purpose dependency injection container.
 - Release signing, notarization, or publication.
@@ -32,6 +34,20 @@ Dependencies point toward `shared`; the renderer never imports Electron or Node.
 bridge exposes named functions rather than raw IPC primitives. Main-process handlers accept calls
 only from the expected window and its main frame.
 
+## Startup file flow
+
+1. The main process resolves the first command-line argument that points to an existing regular
+   file. In development it skips the Electron application entry and command switches.
+2. macOS `open-file` events enter the same flow. A second application launch forwards its file to
+   the existing window.
+3. The main process reads at most 20 MiB of valid UTF-8 text.
+4. A serializable editor state crosses the narrow preload bridge. The renderer never receives a
+   generic file-read capability.
+5. Monaco creates a model whose URI is the absolute file path, allowing language inference from the
+   file name.
+
+When multiple open requests overlap, only the newest completed request may update the editor.
+
 ## Security invariants
 
 - Renderer sandboxing and context isolation remain enabled.
@@ -42,6 +58,8 @@ only from the expected window and its main frame.
   to the private application origin.
 - New windows and permission requests are denied until a feature defines and tests a narrower
   policy.
+- File contents come only from an explicit startup or operating-system open request. Renderer code
+  cannot request arbitrary paths.
 - Content Security Policy limits scripts and resources to the application. Development WebSocket
   connections exist only to support local rebuilds. The renderer does not receive the broader
   privileges associated with `file://` pages.
@@ -55,9 +73,11 @@ Any change that relaxes an invariant must update the code, tests, and this docum
 | ---------------------------- | -------------------------------------- |
 | Runtime behavior             | `src/` and its tests                   |
 | Process contracts            | `src/shared/desktop-api.ts`            |
+| Startup file policy          | `src/main/startup-file.ts`             |
 | Tool versions                | `package.json` and `package-lock.json` |
 | Verification commands        | `package.json` scripts                 |
 | Packaging and security fuses | `scripts/package.mjs`                  |
+| Packaged license notices     | Installed dependency license files     |
 
 Historical notes should not replace these current sources. Add a decision record only when a choice
 will materially constrain future implementation, release, or recovery work.
