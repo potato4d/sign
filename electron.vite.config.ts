@@ -4,6 +4,7 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      minify: 'esbuild',
       rollupOptions: {
         input: 'src/main/index.ts',
       },
@@ -12,6 +13,7 @@ export default defineConfig({
   preload: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      minify: 'esbuild',
       rollupOptions: {
         input: 'src/preload/index.ts',
       },
@@ -20,6 +22,7 @@ export default defineConfig({
   renderer: {
     root: 'src/renderer',
     build: {
+      minify: 'esbuild',
       rollupOptions: {
         input: 'src/renderer/index.html',
       },

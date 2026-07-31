@@ -86,7 +86,10 @@ const focusMainWindow = (): void => {
   mainWindow.focus();
 };
 
-const publishWorkspaceState = (state: EditorWorkspaceState): EditorWorkspaceState => {
+const publishWorkspaceState = (
+  state: EditorWorkspaceState,
+  notifyRenderer = false,
+): EditorWorkspaceState => {
   workspaceState = state;
 
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -96,12 +99,17 @@ const publishWorkspaceState = (state: EditorWorkspaceState): EditorWorkspaceStat
   const document = activeDocument();
 
   mainWindow.setTitle(document ? `${document.fileName} — Winzig` : 'Winzig');
-  mainWindow.webContents.send(IPC_CHANNELS.workspaceStateChanged, workspaceState);
+  if (notifyRenderer) {
+    mainWindow.webContents.send(IPC_CHANNELS.workspaceStateChanged, workspaceState);
+  }
 
   return workspaceState;
 };
 
-const openFilePaths = async (filePaths: readonly string[]): Promise<EditorWorkspaceState> => {
+const openFilePaths = async (
+  filePaths: readonly string[],
+  notifyRenderer = false,
+): Promise<EditorWorkspaceState> => {
   const uniqueFilePaths = [...new Set(filePaths.map((filePath) => resolve(filePath)))];
 
   if (uniqueFilePaths.length === 0) {
@@ -127,6 +135,7 @@ const openFilePaths = async (filePaths: readonly string[]): Promise<EditorWorksp
       activateNewest: isLatestRequest,
       updateError: isLatestRequest,
     }),
+    notifyRenderer,
   );
 };
 
@@ -358,17 +367,17 @@ const openMainWindow = async (): Promise<void> => {
   const initialFilePaths = pendingFilePaths;
   pendingFilePaths = [];
 
-  await openFilePaths(initialFilePaths);
-
   mainWindow = createMainWindow(ipcHandlers);
   mainWindow.once('closed', () => {
     mainWindow = null;
   });
 
+  await openFilePaths(initialFilePaths, true);
+
   if (pendingFilePaths.length > 0) {
     const laterFilePaths = pendingFilePaths;
     pendingFilePaths = [];
-    await openFilePaths(laterFilePaths);
+    await openFilePaths(laterFilePaths, true);
   }
 };
 
@@ -393,7 +402,7 @@ app.on('open-file', (event, filePath) => {
     return;
   }
 
-  void openFilePaths([filePath]).then(focusMainWindow);
+  void openFilePaths([filePath], true).then(focusMainWindow);
 });
 
 app.on('web-contents-created', (_event, webContents) => {
@@ -425,7 +434,7 @@ if (!hasSingleInstanceLock) {
       return;
     }
 
-    void openFilePaths(filePaths).then(focusMainWindow);
+    void openFilePaths(filePaths, true).then(focusMainWindow);
   });
 
   void app.whenReady().then(async () => {

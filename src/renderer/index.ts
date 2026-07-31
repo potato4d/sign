@@ -1,17 +1,15 @@
-import './monaco-environment';
 import './styles.css';
 
-import * as monaco from 'monaco-editor';
-
 import type { EditorCommand, EditorWorkspaceState, OpenedDocument } from '../shared/desktop-api';
+import type * as Monaco from 'monaco-editor';
 
 import { resolveKeyboardShortcut } from './keyboard-shortcuts';
 
 interface EditorTab {
-  readonly contentListener: monaco.IDisposable;
-  readonly model: monaco.editor.ITextModel;
+  readonly contentListener: Monaco.IDisposable;
+  readonly model: Monaco.editor.ITextModel;
   savedAlternativeVersionId: number;
-  viewState: monaco.editor.ICodeEditorViewState | null;
+  viewState: Monaco.editor.ICodeEditorViewState | null;
 }
 
 const requireElement = <ElementType extends Element>(selector: string): ElementType => {
@@ -38,10 +36,12 @@ const tabListElement = requireElement<HTMLDivElement>('#tab-list');
 const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
 const highContrast = window.matchMedia('(prefers-contrast: more)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const emptyModel = monaco.editor.createModel('', 'plaintext');
 const tabsByDocumentId = new Map<string, EditorTab>();
 const tabButtonsByDocumentId = new Map<string, HTMLButtonElement>();
 const shortcutPlatform = window.desktop.platform === 'darwin' ? 'macos' : 'other';
+let editor: Monaco.editor.IStandaloneCodeEditor | null = null;
+let editorInitialization: Promise<void> | null = null;
+let monaco: typeof Monaco | null = null;
 let quickSwitcherDocumentIds: string[] = [];
 let quickSwitcherSelection = 0;
 let wordWrapEnabled = false;
@@ -50,6 +50,7 @@ let workspaceState: EditorWorkspaceState = {
   documents: [],
   error: null,
 };
+document.body.classList.add(`platform-${window.desktop.platform}`);
 
 const themeForPreferences = (): string => {
   if (highContrast.matches) {
@@ -58,41 +59,6 @@ const themeForPreferences = (): string => {
 
   return darkMode.matches ? 'vs-dark' : 'vs';
 };
-
-const editor = monaco.editor.create(editorElement, {
-  accessibilitySupport: 'auto',
-  automaticLayout: true,
-  bracketPairColorization: {
-    enabled: true,
-  },
-  cursorBlinking: reducedMotion.matches ? 'solid' : 'blink',
-  cursorSmoothCaretAnimation: reducedMotion.matches ? 'off' : 'on',
-  fixedOverflowWidgets: true,
-  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-  fontLigatures: false,
-  fontSize: 13,
-  guides: {
-    bracketPairs: true,
-    indentation: true,
-  },
-  minimap: {
-    enabled: true,
-  },
-  model: emptyModel,
-  padding: {
-    bottom: 12,
-    top: 12,
-  },
-  renderWhitespace: 'selection',
-  scrollBeyondLastLine: false,
-  smoothScrolling: !reducedMotion.matches,
-  stickyScroll: {
-    enabled: true,
-  },
-  theme: themeForPreferences(),
-  wordWrap: 'off',
-});
-document.body.classList.add(`platform-${window.desktop.platform}`);
 
 const showNotice = (message: string): void => {
   noticeElement.textContent = message;
@@ -111,7 +77,7 @@ const isTabDirty = (tab: EditorTab): boolean =>
   tab.model.getAlternativeVersionId() !== tab.savedAlternativeVersionId;
 
 const saveViewState = (documentId: string | null): void => {
-  if (!documentId) {
+  if (!documentId || !editor) {
     return;
   }
 
@@ -124,33 +90,50 @@ const saveViewState = (documentId: string | null): void => {
 
 const updateTabPresentation = (): void => {
   for (const [documentId, button] of tabButtonsByDocumentId) {
-    const tab = tabsByDocumentId.get(documentId);
-    const document = documentForId(documentId);
-    const isActive = documentId === workspaceState.activeDocumentId;
-    const isDirty = tab ? isTabDirty(tab) : false;
-
-    button.setAttribute('aria-selected', String(isActive));
-    button.classList.toggle('tab__select--active', isActive);
-
-    if (document) {
-      button.setAttribute(
-        'aria-label',
-        isDirty ? `${document.fileName}, modified` : document.fileName,
-      );
-    }
-
-    const tabItem = button.closest<HTMLElement>('.tab');
-    tabItem?.classList.toggle('tab--active', isActive);
-    tabItem?.classList.toggle('tab--dirty', isDirty);
+    updateTabPresentationForDocument(documentId, button);
   }
 };
 
-const activateTabLocally = (documentId: string, focusEditor = true): void => {
+const updateTabPresentationForDocument = (
+  documentId: string,
+  button = tabButtonsByDocumentId.get(documentId),
+): void => {
+  if (!button) {
+    return;
+  }
+
   const tab = tabsByDocumentId.get(documentId);
+  const document = documentForId(documentId);
+  const isActive = documentId === workspaceState.activeDocumentId;
+  const isDirty = tab ? isTabDirty(tab) : false;
+
+  button.setAttribute('aria-selected', String(isActive));
+  button.classList.toggle('tab__select--active', isActive);
+
+  if (document) {
+    button.setAttribute(
+      'aria-label',
+      isDirty ? `${document.fileName}, modified` : document.fileName,
+    );
+  }
+
+  const tabItem = button.closest<HTMLElement>('.tab');
+  tabItem?.classList.toggle('tab--active', isActive);
+  tabItem?.classList.toggle('tab--dirty', isDirty);
+};
+
+const activateTabLocally = (documentId: string, focusEditor = true): void => {
   const openedDocument = documentForId(documentId);
 
-  if (!tab || !openedDocument) {
+  if (!editor || !openedDocument) {
     return;
+  }
+
+  let tab = tabsByDocumentId.get(documentId);
+
+  if (!tab) {
+    tab = createTab(openedDocument);
+    tabsByDocumentId.set(documentId, tab);
   }
 
   if (workspaceState.activeDocumentId !== documentId) {
@@ -191,6 +174,10 @@ const activateDocument = async (documentId: string): Promise<void> => {
 };
 
 const languageForDocument = (document: OpenedDocument): string | null => {
+  if (!monaco) {
+    return null;
+  }
+
   const fileName = document.fileName.toLowerCase();
   const language = monaco.languages.getLanguages().find((candidate) => {
     if (candidate.filenames?.some((name) => name.toLowerCase() === fileName)) {
@@ -204,6 +191,10 @@ const languageForDocument = (document: OpenedDocument): string | null => {
 };
 
 const updateModelLanguage = (document: OpenedDocument, tab: EditorTab): void => {
+  if (!monaco) {
+    return;
+  }
+
   const language = languageForDocument(document);
 
   if (language && tab.model.getLanguageId() !== language) {
@@ -212,6 +203,10 @@ const updateModelLanguage = (document: OpenedDocument, tab: EditorTab): void => 
 };
 
 const saveDocument = async (documentId: string, saveAs = false): Promise<boolean> => {
+  if (!editor && documentForId(documentId)) {
+    await ensureEditorRuntime();
+  }
+
   const tab = tabsByDocumentId.get(documentId);
 
   if (!tab) {
@@ -255,11 +250,11 @@ const closeDocument = async (documentId: string): Promise<void> => {
   const tab = tabsByDocumentId.get(documentId);
   const document = documentForId(documentId);
 
-  if (!tab || !document) {
+  if (!document) {
     return;
   }
 
-  if (isTabDirty(tab)) {
+  if (tab && isTabDirty(tab)) {
     let decision;
 
     try {
@@ -360,6 +355,10 @@ const renderTabs = (): void => {
 };
 
 const createTab = (document: OpenedDocument): EditorTab => {
+  if (!monaco) {
+    throw new Error('The editor runtime is not ready.');
+  }
+
   const uri = monaco.Uri.from({
     authority: document.documentId,
     path: `/${document.fileName}`,
@@ -368,7 +367,7 @@ const createTab = (document: OpenedDocument): EditorTab => {
   const model = monaco.editor.createModel(document.contents, 'plaintext', uri);
   const savedAlternativeVersionId = model.getAlternativeVersionId();
   const contentListener = model.onDidChangeContent(() => {
-    updateTabPresentation();
+    updateTabPresentationForDocument(document.documentId);
   });
 
   const tab = {
@@ -382,19 +381,19 @@ const createTab = (document: OpenedDocument): EditorTab => {
   return tab;
 };
 
-const applyWorkspaceState = (state: EditorWorkspaceState): void => {
-  const wasEmpty = workspaceState.documents.length === 0;
-  saveViewState(workspaceState.activeDocumentId);
-  workspaceState = state;
-  const isEmpty = state.documents.length === 0;
-  const openDocumentIds = new Set(state.documents.map((document) => document.documentId));
+const synchronizeEditorModels = (): void => {
+  if (!editor || !monaco) {
+    return;
+  }
 
-  for (const document of state.documents) {
+  const openDocumentIds = new Set(workspaceState.documents.map((document) => document.documentId));
+
+  for (const document of workspaceState.documents) {
     const existingTab = tabsByDocumentId.get(document.documentId);
 
     if (existingTab) {
       updateModelLanguage(document, existingTab);
-    } else {
+    } else if (document.documentId === workspaceState.activeDocumentId) {
       tabsByDocumentId.set(document.documentId, createTab(document));
     }
   }
@@ -405,7 +404,7 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
     }
 
     if (editor.getModel() === tab.model) {
-      editor.setModel(emptyModel);
+      editor.setModel(null);
     }
 
     tab.contentListener.dispose();
@@ -414,19 +413,96 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
   }
 
   renderTabs();
+
+  if (workspaceState.activeDocumentId && tabsByDocumentId.has(workspaceState.activeDocumentId)) {
+    editor.layout();
+    activateTabLocally(workspaceState.activeDocumentId);
+  } else {
+    editor.setModel(null);
+  }
+};
+
+const ensureEditorRuntime = async (): Promise<void> => {
+  if (editor) {
+    return;
+  }
+
+  editorInitialization ??= (async () => {
+    await import('./monaco-environment');
+    const monacoApi = await import('monaco-editor');
+
+    monaco = monacoApi;
+    editor = monacoApi.editor.create(editorElement, {
+      accessibilitySupport: 'auto',
+      automaticLayout: true,
+      bracketPairColorization: {
+        enabled: false,
+      },
+      cursorBlinking: reducedMotion.matches ? 'solid' : 'blink',
+      cursorSmoothCaretAnimation: reducedMotion.matches ? 'off' : 'on',
+      fixedOverflowWidgets: true,
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      fontLigatures: false,
+      fontSize: 13,
+      guides: {
+        bracketPairs: false,
+        indentation: true,
+      },
+      minimap: {
+        enabled: false,
+      },
+      model: null,
+      padding: {
+        bottom: 12,
+        top: 12,
+      },
+      renderWhitespace: 'selection',
+      scrollBeyondLastLine: false,
+      smoothScrolling: false,
+      stickyScroll: {
+        enabled: false,
+      },
+      theme: themeForPreferences(),
+      wordWrap: wordWrapEnabled ? 'on' : 'off',
+    });
+    synchronizeEditorModels();
+  })().catch(() => {
+    editorInitialization = null;
+    showNotice('The editor could not be loaded.');
+  });
+
+  await editorInitialization;
+};
+
+const applyWorkspaceState = (state: EditorWorkspaceState): void => {
+  const wasEmpty = workspaceState.documents.length === 0;
+  saveViewState(workspaceState.activeDocumentId);
+  workspaceState = state;
+  const isEmpty = state.documents.length === 0;
+
+  renderTabs();
   document.body.classList.toggle('workspace-empty', isEmpty);
   emptyWorkspaceElement.hidden = !isEmpty;
   editorElement.hidden = isEmpty;
 
-  if (state.activeDocumentId && tabsByDocumentId.has(state.activeDocumentId)) {
-    editor.layout();
-    activateTabLocally(state.activeDocumentId);
-  } else {
-    editor.setModel(emptyModel);
+  if (isEmpty) {
+    synchronizeEditorModels();
     document.title = 'Winzig';
 
     if (!wasEmpty || document.activeElement === document.body) {
       createEmptyFileButton.focus({ preventScroll: true });
+    }
+  } else {
+    const document = documentForId(state.activeDocumentId);
+
+    if (document) {
+      window.document.title = `${document.fileName} — Winzig`;
+    }
+
+    if (editor) {
+      synchronizeEditorModels();
+    } else {
+      void ensureEditorRuntime();
     }
   }
 
@@ -593,10 +669,10 @@ const openQuickSwitcher = (): void => {
 
 const toggleWordWrap = (): void => {
   wordWrapEnabled = !wordWrapEnabled;
-  editor.updateOptions({
+  editor?.updateOptions({
     wordWrap: wordWrapEnabled ? 'on' : 'off',
   });
-  editor.focus();
+  editor?.focus();
 };
 
 const runEditorCommand = (command: EditorCommand): void => {
@@ -615,7 +691,7 @@ const runEditorCommand = (command: EditorCommand): void => {
       }
       break;
     case 'command-palette':
-      void editor.getAction('editor.action.quickCommand')?.run();
+      void editor?.getAction('editor.action.quickCommand')?.run();
       break;
     case 'create-document':
       void createDocument();
@@ -633,7 +709,7 @@ const runEditorCommand = (command: EditorCommand): void => {
       openQuickSwitcher();
       break;
     case 'redo':
-      editor.trigger('application-menu', 'redo', null);
+      editor?.trigger('application-menu', 'redo', null);
       break;
     case 'reopen-closed-document':
       void reopenClosedDocument();
@@ -648,20 +724,19 @@ const runEditorCommand = (command: EditorCommand): void => {
       toggleWordWrap();
       break;
     case 'undo':
-      editor.trigger('application-menu', 'undo', null);
+      editor?.trigger('application-menu', 'undo', null);
       break;
   }
 };
 
 const updateTheme = (): void => {
-  monaco.editor.setTheme(themeForPreferences());
+  monaco?.editor.setTheme(themeForPreferences());
 };
 
 const updateMotionPreferences = (): void => {
-  editor.updateOptions({
+  editor?.updateOptions({
     cursorBlinking: reducedMotion.matches ? 'solid' : 'blink',
     cursorSmoothCaretAnimation: reducedMotion.matches ? 'off' : 'on',
-    smoothScrolling: !reducedMotion.matches,
   });
 };
 
@@ -728,14 +803,12 @@ window.addEventListener('beforeunload', () => {
   highContrast.removeEventListener('change', updateTheme);
   reducedMotion.removeEventListener('change', updateMotionPreferences);
 
-  editor.dispose();
+  editor?.dispose();
 
   for (const tab of tabsByDocumentId.values()) {
     tab.contentListener.dispose();
     tab.model.dispose();
   }
-
-  emptyModel.dispose();
 });
 
 void initializeEditor();

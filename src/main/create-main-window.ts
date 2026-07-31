@@ -40,6 +40,7 @@ export const createMainWindow = (ipcHandlers: AppIpcHandlers): BrowserWindow => 
       devTools: !app.isPackaged,
       nodeIntegration: false,
       sandbox: true,
+      spellcheck: false,
       webSecurity: true,
       webviewTag: false,
     },

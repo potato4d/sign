@@ -44,8 +44,9 @@ only from the expected window and its main frame.
 4. A serializable workspace state crosses the narrow preload bridge. It contains the ordered open
    documents, active path, and latest open error; the renderer never receives a generic file-read
    capability.
-5. Monaco creates one model per document with a stable internal URI. Language mode is inferred from
-   the visible file name and updated after Save As without replacing the model.
+5. Monaco creates a model for the active document and creates inactive models on first selection.
+   Each model receives a stable internal URI. Language mode is inferred from the visible file name
+   and updated after Save As without replacing the model.
 
 When open requests overlap, every unique document is retained, but only the newest request may take
 focus or replace the visible error state.
@@ -84,6 +85,18 @@ focus or replace the visible error state.
 - The tab bar is the window drag region. Tabs and toolbar buttons explicitly opt out so they remain
   interactive, and the leading inset keeps content clear of the native window buttons.
 - Other platforms retain their native title bars until equivalent window controls are implemented.
+
+## Resource use
+
+- An empty workspace renders the lightweight application shell without loading Monaco. The editor
+  runtime is loaded once, when the first document becomes active.
+- Tabs that have never been selected retain their source contents in main-process state without
+  allocating a Monaco model, undo stack, or language worker.
+- Renderer-initiated mutations apply the state returned by IPC. State-change events are reserved
+  for operating-system and second-instance file opens so large document contents are not cloned and
+  rendered twice.
+- Production renderer assets are minified, and the private application protocol enables Chromium's
+  code cache for faster repeat launches.
 
 ## Security invariants
 

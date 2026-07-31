@@ -9,6 +9,7 @@ export const registerApplicationScheme = (): void => {
     {
       scheme: APPLICATION_SCHEME,
       privileges: {
+        codeCache: true,
         secure: true,
         standard: true,
         supportFetchAPI: true,
