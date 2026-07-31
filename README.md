@@ -2,6 +2,19 @@
 
 A small desktop text editor built with Electron, TypeScript, and Monaco Editor.
 
+## Installation
+
+Winzig `0.1.0` supports Macs with Apple silicon.
+
+```sh
+brew install --cask potato4d/tap/winzig
+```
+
+The current release is not signed with a Developer ID or notarized. If macOS
+blocks the first launch, open the Applications folder in Finder, Control-click
+Winzig, choose **Open**, and confirm. If **Open** is not offered, allow Winzig
+from **System Settings > Privacy & Security** and try again.
+
 ## Features
 
 - Open multiple UTF-8 text files in tabs.
@@ -36,9 +49,9 @@ npm run package
 Architecture and security notes are available in
 [docs/architecture.md](docs/architecture.md).
 
-## Version
+## Release
 
-The initial version is `0.1.0`.
+The current release is `0.1.0`.
 
 ## License
 
