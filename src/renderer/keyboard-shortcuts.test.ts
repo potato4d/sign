@@ -28,7 +28,13 @@ describe('resolveKeyboardShortcut', () => {
     expect(resolve('KeyS', { ctrlKey: true, shiftKey: true })).toBe('save-document-as');
     expect(resolve('KeyW', { ctrlKey: true })).toBe('close-active-document');
     expect(resolve('KeyT', { ctrlKey: true, shiftKey: true })).toBe('reopen-closed-document');
+    expect(resolve('KeyN', { metaKey: true }, 'macos')).toBe('create-document');
+    expect(resolve('KeyT', { metaKey: true }, 'macos')).toBe('create-document');
+    expect(resolve('KeyT', { metaKey: true, shiftKey: true }, 'macos')).toBe(
+      'reopen-closed-document',
+    );
     expect(resolve('KeyS', { metaKey: true }, 'macos')).toBe('save-document');
+    expect(resolve('KeyT', { ctrlKey: true })).toBeNull();
   });
 
   it('does not treat the macOS Control key as the primary modifier', () => {

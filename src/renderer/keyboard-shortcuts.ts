@@ -82,6 +82,8 @@ export const resolveKeyboardShortcut = (
   switch (input.code) {
     case 'KeyN':
       return 'create-document';
+    case 'KeyT':
+      return platform === 'macos' ? 'create-document' : null;
     case 'KeyO':
       return 'open-files';
     case 'KeyP':

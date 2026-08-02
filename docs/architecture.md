@@ -74,7 +74,8 @@ focus or replace the visible error state.
 - The native application menu defines desktop-level commands and their canonical accelerators.
 - Menu actions send an allowlisted command value through the preload bridge; arbitrary command names
   are rejected.
-- Renderer key handling adds only platform-specific tab-navigation aliases and direct tab selection.
+- Renderer key handling adds platform-specific tab aliases, including `Command-T` for a new
+  document on macOS, plus relative and direct tab selection.
 - Monaco remains authoritative for text-editing bindings such as undo, search, replacement, folding,
   comments, and multiple cursors.
 - Zoom and full-screen behavior use native Electron roles.
