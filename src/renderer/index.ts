@@ -25,6 +25,7 @@ const requireElement = <ElementType extends Element>(selector: string): ElementT
 const editorElement = requireElement<HTMLElement>('#editor');
 const emptyWorkspaceElement = requireElement<HTMLElement>('#empty-workspace');
 const createEmptyFileButton = requireElement<HTMLButtonElement>('#create-empty-file');
+const dropOverlayElement = requireElement<HTMLDivElement>('#drop-overlay');
 const openEmptyFileButton = requireElement<HTMLButtonElement>('#open-empty-file');
 const noticeElement = requireElement<HTMLDivElement>('#notice');
 const openFilesButton = requireElement<HTMLButtonElement>('#open-files');
@@ -40,6 +41,7 @@ const tabsByDocumentId = new Map<string, EditorTab>();
 const tabButtonsByDocumentId = new Map<string, HTMLButtonElement>();
 const shortcutPlatform = window.desktop.platform === 'darwin' ? 'macos' : 'other';
 let editor: Monaco.editor.IStandaloneCodeEditor | null = null;
+let fileDragDepth = 0;
 let editorInitialization: Promise<void> | null = null;
 let monaco: typeof Monaco | null = null;
 let quickSwitcherDocumentIds: string[] = [];
@@ -68,6 +70,26 @@ const showNotice = (message: string): void => {
 const hideNotice = (): void => {
   noticeElement.hidden = true;
   noticeElement.textContent = '';
+};
+
+const hasFiles = (dataTransfer: DataTransfer | null): dataTransfer is DataTransfer =>
+  dataTransfer !== null && [...dataTransfer.types].includes('Files');
+
+const setDropOverlayVisible = (isVisible: boolean): void => {
+  dropOverlayElement.classList.toggle('drop-overlay--visible', isVisible);
+  dropOverlayElement.setAttribute('aria-hidden', String(!isVisible));
+};
+
+const openDroppedFiles = async (files: readonly File[]): Promise<void> => {
+  if (files.length === 0) {
+    return;
+  }
+
+  try {
+    applyWorkspaceState(await window.desktop.openDroppedFiles(files));
+  } catch {
+    showNotice('The dropped files could not be opened.');
+  }
 };
 
 const documentForId = (documentId: string | null): OpenedDocument | undefined =>
@@ -779,6 +801,69 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault();
     runEditorCommand(command);
   }
+});
+window.addEventListener(
+  'dragenter',
+  (event) => {
+    if (!hasFiles(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    fileDragDepth += 1;
+    setDropOverlayVisible(true);
+  },
+  true,
+);
+window.addEventListener(
+  'dragover',
+  (event) => {
+    if (!hasFiles(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+  },
+  true,
+);
+window.addEventListener(
+  'dragleave',
+  (event) => {
+    if (fileDragDepth === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    fileDragDepth -= 1;
+
+    if (fileDragDepth === 0) {
+      setDropOverlayVisible(false);
+    }
+  },
+  true,
+);
+window.addEventListener(
+  'drop',
+  (event) => {
+    if (!hasFiles(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    fileDragDepth = 0;
+    setDropOverlayVisible(false);
+    void openDroppedFiles([...event.dataTransfer.files]);
+  },
+  true,
+);
+window.addEventListener('blur', () => {
+  fileDragDepth = 0;
+  setDropOverlayVisible(false);
 });
 
 darkMode.addEventListener('change', updateTheme);

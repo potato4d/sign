@@ -93,6 +93,16 @@ try {
     dir: stagingDirectory,
     electronVersion,
     executableName: 'winzig',
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'Document',
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Alternate',
+          LSItemContentTypes: ['public.data'],
+        },
+      ],
+    },
     name: 'Winzig',
     out: outputDirectory,
     overwrite: true,

@@ -7,7 +7,7 @@ import type {
   EditorWorkspaceState,
 } from '../shared/desktop-api';
 
-import { IPC_CHANNELS } from '../shared/desktop-api';
+import { IPC_CHANNELS, isDroppedFilePathList } from '../shared/desktop-api';
 
 const isExpectedSender = (event: IpcMainInvokeEvent, mainWindow: BrowserWindow): boolean =>
   event.sender === mainWindow.webContents && event.senderFrame === mainWindow.webContents.mainFrame;
@@ -18,6 +18,7 @@ export interface AppIpcHandlers {
   readonly confirmClose: (documentId: string) => Promise<CloseDecision>;
   readonly createDocument: () => EditorWorkspaceState;
   readonly getWorkspaceState: () => EditorWorkspaceState;
+  readonly openDroppedFiles: (filePaths: readonly string[]) => Promise<EditorWorkspaceState>;
   readonly openFiles: () => Promise<EditorWorkspaceState>;
   readonly quitApplicationIfEmpty: () => boolean;
   readonly reopenClosedDocument: () => Promise<EditorWorkspaceState>;
@@ -47,6 +48,14 @@ const requireContents = (value: unknown): string => {
   return value;
 };
 
+const requireDroppedFilePaths = (value: unknown): readonly string[] => {
+  if (!isDroppedFilePathList(value)) {
+    throw new TypeError('Expected a bounded list of dropped file paths.');
+  }
+
+  return value;
+};
+
 export const registerAppIpc = (
   mainWindow: BrowserWindow,
   handlers: AppIpcHandlers,
@@ -60,6 +69,14 @@ export const registerAppIpc = (
     assertExpectedSender(event, mainWindow);
     return handlers.openFiles();
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.openDroppedFiles,
+    async (event, filePaths: unknown): Promise<EditorWorkspaceState> => {
+      assertExpectedSender(event, mainWindow);
+      return handlers.openDroppedFiles(requireDroppedFilePaths(filePaths));
+    },
+  );
 
   ipcMain.handle(IPC_CHANNELS.createDocument, (event): EditorWorkspaceState => {
     assertExpectedSender(event, mainWindow);
@@ -120,6 +137,7 @@ export const registerAppIpc = (
     ipcMain.removeHandler(IPC_CHANNELS.createDocument);
     ipcMain.removeHandler(IPC_CHANNELS.getWorkspaceState);
     ipcMain.removeHandler(IPC_CHANNELS.openFiles);
+    ipcMain.removeHandler(IPC_CHANNELS.openDroppedFiles);
     ipcMain.removeHandler(IPC_CHANNELS.quitApplicationIfEmpty);
     ipcMain.removeHandler(IPC_CHANNELS.reopenClosedDocument);
     ipcMain.removeHandler(IPC_CHANNELS.saveDocument);

@@ -20,6 +20,7 @@ from **System Settings > Privacy & Security** and try again.
 - Open multiple UTF-8 text files in tabs.
 - Create, edit, save, and reopen files.
 - Open file paths passed at startup.
+- Drop files onto the window or macOS app icon, regardless of filename extension.
 - Use familiar desktop editing and tab shortcuts.
 - Keep native macOS window controls with an integrated tab bar.
 

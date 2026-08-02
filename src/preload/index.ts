@@ -1,4 +1,6 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
+
+import type { File as DroppedFile } from 'node:buffer';
 
 import type {
   CloseDecision,
@@ -11,6 +13,7 @@ import type {
 
 import {
   IPC_CHANNELS,
+  MAXIMUM_DROPPED_FILES,
   isCloseDecision,
   isDocumentSaveResult,
   isEditorCommand,
@@ -42,6 +45,24 @@ const invokeSave = async (
   }
 
   return result;
+};
+
+const pathsForDroppedFiles = (files: readonly unknown[]): readonly string[] => {
+  if (!Array.isArray(files) || files.length > MAXIMUM_DROPPED_FILES) {
+    throw new TypeError('Expected a bounded list of dropped files.');
+  }
+
+  const filePaths = new Set<string>();
+
+  for (const file of files) {
+    const filePath = webUtils.getPathForFile(file as DroppedFile);
+
+    if (filePath) {
+      filePaths.add(filePath);
+    }
+  }
+
+  return [...filePaths];
 };
 
 const desktopApi: DesktopApi = Object.freeze({
@@ -86,6 +107,8 @@ const desktopApi: DesktopApi = Object.freeze({
       ipcRenderer.removeListener(IPC_CHANNELS.workspaceStateChanged, handleStateChanged);
     };
   },
+  openDroppedFiles: (files: readonly unknown[]) =>
+    invokeWorkspaceState(IPC_CHANNELS.openDroppedFiles, pathsForDroppedFiles(files)),
   openFiles: () => invokeWorkspaceState(IPC_CHANNELS.openFiles),
   platform: (process.platform === 'darwin' || process.platform === 'win32'
     ? process.platform

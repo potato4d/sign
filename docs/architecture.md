@@ -38,12 +38,15 @@ only from the expected window and its main frame.
 
 1. The main process resolves every unique command-line argument that points to an existing regular
    file. In development it skips the Electron application entry and command switches.
-2. macOS `open-file` events, second application launches, and the native multi-file dialog enter the
-   same loading flow.
+2. Window drops, macOS `open-file` events, second application launches, and the native multi-file
+   dialog enter the same loading flow. The macOS bundle advertises alternate editor support for
+   `public.data`, allowing Finder to send regular files regardless of filename extension without
+   claiming the default application role.
 3. The main process reads at most 20 MiB of valid UTF-8 text per file.
-4. A serializable workspace state crosses the narrow preload bridge. It contains the ordered open
-   documents, active path, and latest open error; the renderer never receives a generic file-read
-   capability.
+4. For a window drop, preload converts only operating-system-backed browser `File` objects to paths
+   with Electron's dedicated utility. A serializable workspace state then crosses the narrow
+   preload bridge. It contains the ordered open documents, active path, and latest open error; the
+   renderer never receives a generic path-open or file-read capability.
 5. Monaco creates a model for the active document and creates inactive models on first selection.
    Each model receives a stable internal URI. Language mode is inferred from the visible file name
    and updated after Save As without replacing the model.
@@ -108,8 +111,8 @@ focus or replace the visible error state.
   to the private application origin.
 - New windows and permission requests are denied until a feature defines and tests a narrower
   policy.
-- File contents come only from an explicit startup or operating-system open request. Renderer code
-  cannot request arbitrary paths.
+- File contents come only from an explicit startup, native dialog, operating-system open, or
+  operating-system-backed drop request. Renderer code cannot request arbitrary paths.
 - Content Security Policy limits scripts and resources to the application. Development WebSocket
   connections exist only to support local rebuilds. The renderer does not receive the broader
   privileges associated with `file://` pages.

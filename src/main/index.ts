@@ -351,6 +351,7 @@ const ipcHandlers: AppIpcHandlers = {
   confirmClose,
   createDocument,
   getWorkspaceState: () => workspaceState,
+  openDroppedFiles: (filePaths) => openFilePaths(filePaths),
   openFiles: openFilesWithDialog,
   quitApplicationIfEmpty,
   reopenClosedDocument,

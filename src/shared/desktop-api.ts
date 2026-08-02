@@ -5,6 +5,7 @@ export const IPC_CHANNELS = {
   createDocument: 'workspace:create-document',
   editorCommand: 'editor:command',
   getWorkspaceState: 'workspace:get-state',
+  openDroppedFiles: 'workspace:open-dropped-files',
   openFiles: 'workspace:open-files',
   quitApplicationIfEmpty: 'application:quit-if-empty',
   reopenClosedDocument: 'workspace:reopen-closed-document',
@@ -70,6 +71,8 @@ export interface EditorWorkspaceState {
 export type CloseDecision = 'cancel' | 'discard' | 'save';
 export type DesktopPlatform = 'darwin' | 'linux' | 'win32';
 
+export const MAXIMUM_DROPPED_FILES = 256;
+
 export type DocumentSaveResult =
   | {
       readonly documentId: string;
@@ -94,6 +97,7 @@ export interface DesktopApi {
   getWorkspaceState(): Promise<EditorWorkspaceState>;
   onEditorCommand(listener: (command: EditorCommand) => void): () => void;
   onWorkspaceStateChanged(listener: (state: EditorWorkspaceState) => void): () => void;
+  openDroppedFiles(files: readonly unknown[]): Promise<EditorWorkspaceState>;
   openFiles(): Promise<EditorWorkspaceState>;
   readonly platform: DesktopPlatform;
   quitApplicationIfEmpty(): Promise<boolean>;
@@ -104,6 +108,13 @@ export interface DesktopApi {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
+
+export const isDroppedFilePathList = (value: unknown): value is readonly string[] =>
+  Array.isArray(value) &&
+  value.length <= MAXIMUM_DROPPED_FILES &&
+  value.every(
+    (filePath) => typeof filePath === 'string' && filePath.length > 0 && !filePath.includes('\0'),
+  );
 
 const isOpenedDocument = (value: unknown): value is OpenedDocument => {
   if (!isRecord(value)) {
