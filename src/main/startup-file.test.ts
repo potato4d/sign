@@ -5,8 +5,13 @@ import { loadFile, resolveStartupFilePaths } from './startup-file';
 describe('resolveStartupFilePaths', () => {
   const existingFile = '/workspace/notes/example.ts';
   const secondFile = '/workspace/notes/example.json';
+  const extensionlessFile = '/workspace/notes/README';
+  const unknownExtensionFile = '/workspace/notes/example.unregistered-extension';
   const isFile = (candidate: string): boolean =>
-    candidate === existingFile || candidate === secondFile;
+    candidate === existingFile ||
+    candidate === secondFile ||
+    candidate === extensionlessFile ||
+    candidate === unknownExtensionFile;
 
   it('finds packaged application file arguments in order', () => {
     expect(
@@ -39,6 +44,17 @@ describe('resolveStartupFilePaths', () => {
         isPackaged: true,
       }),
     ).toEqual([]);
+  });
+
+  it('accepts extensionless and unregistered file names', () => {
+    expect(
+      resolveStartupFilePaths({
+        argv: ['/Applications/Winzig', extensionlessFile, unknownExtensionFile],
+        cwd: '/workspace',
+        isFile,
+        isPackaged: true,
+      }),
+    ).toEqual([extensionlessFile, unknownExtensionFile]);
   });
 });
 
