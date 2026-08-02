@@ -4,7 +4,7 @@ A small desktop text editor built with Electron, TypeScript, and Monaco Editor.
 
 ## Installation
 
-Winzig `0.1.0` supports Macs with Apple silicon running macOS 12 or later.
+Winzig `0.2.0` supports Macs with Apple silicon running macOS 12 or later.
 
 ```sh
 brew install --cask potato4d/tap/winzig
@@ -51,7 +51,7 @@ Architecture and security notes are available in
 
 ## Release
 
-The current release is `0.1.0`.
+The current release is `0.2.0`.
 
 ## License
 
