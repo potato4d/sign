@@ -461,7 +461,7 @@ const ensureEditorRuntime = async (): Promise<void> => {
         enabled: false,
       },
       cursorBlinking: reducedMotion.matches ? 'solid' : 'blink',
-      cursorSmoothCaretAnimation: reducedMotion.matches ? 'off' : 'on',
+      cursorSmoothCaretAnimation: 'off',
       fixedOverflowWidgets: true,
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       fontLigatures: false,
@@ -758,7 +758,6 @@ const updateTheme = (): void => {
 const updateMotionPreferences = (): void => {
   editor?.updateOptions({
     cursorBlinking: reducedMotion.matches ? 'solid' : 'blink',
-    cursorSmoothCaretAnimation: reducedMotion.matches ? 'off' : 'on',
   });
 };
 
