@@ -39,9 +39,11 @@ only from the expected window and its main frame.
 1. The main process resolves every unique command-line argument that points to an existing regular
    file. In development it skips the Electron application entry and command switches.
 2. Window drops, macOS `open-file` events, second application launches, and the native multi-file
-   dialog enter the same loading flow. The macOS bundle advertises alternate editor support for
-   `public.data`, allowing Finder to send regular files regardless of filename extension without
-   claiming the default application role.
+   dialog enter the same loading flow. The packaged CLI forwards its already-resolved file list
+   through Electron's single-instance data so argument order and the invoking terminal's working
+   directory remain stable. The macOS bundle advertises alternate editor support for `public.data`,
+   allowing Finder to send regular files regardless of filename extension without claiming the
+   default application role.
 3. The main process reads at most 20 MiB of valid UTF-8 text per file.
 4. For a window drop, preload converts only operating-system-backed browser `File` objects to paths
    with Electron's dedicated utility. A serializable workspace state then crosses the narrow
@@ -53,6 +55,20 @@ only from the expected window and its main frame.
 
 When open requests overlap, every unique document is retained, but only the newest request may take
 focus or replace the visible error state.
+
+## Command-line launcher
+
+- Packaging places the executable POSIX launcher at `Contents/Resources/bin/sign`, outside the
+  application archive but inside the signed app bundle.
+- The packaged macOS application menu offers an explicit install action. It creates an absolute
+  symlink at `/usr/local/bin/sign`, uses administrator authorization only when normal filesystem
+  access is insufficient, and verifies the resulting link.
+- Installation is idempotent for the current launcher and refuses to replace any regular file or
+  link with a different target. App Translocation paths are rejected because they are temporary.
+- The launcher resolves its installed symlink, starts `Contents/MacOS/sign` detached from the
+  terminal, preserves argument boundaries and the terminal working directory, and returns
+  immediately. File arguments then enter the same startup and single-instance validation as Finder
+  and native-open requests.
 
 ## Tab ownership
 
@@ -128,6 +144,8 @@ Any change that relaxes an invariant must update the code, tests, and this docum
 | Runtime behavior             | `src/` and its tests                   |
 | Process contracts            | `src/shared/desktop-api.ts`            |
 | Startup file policy          | `src/main/startup-file.ts`             |
+| CLI installation policy      | `src/main/cli-launcher.ts`             |
+| Packaged CLI entry point     | `resources/bin/sign`                   |
 | Tab state transitions        | `src/main/workspace-state.ts`          |
 | Tool versions                | `package.json` and `package-lock.json` |
 | Verification commands        | `package.json` scripts                 |

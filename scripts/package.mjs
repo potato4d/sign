@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
+import { access, cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -10,7 +11,7 @@ import { packager } from '@electron/packager';
 const projectDirectory = process.cwd();
 const manifestPath = path.join(projectDirectory, 'package.json');
 const outputDirectory = path.join(projectDirectory, 'release');
-const stagingDirectory = await mkdtemp(path.join(tmpdir(), 'winzig-package-'));
+const stagingDirectory = await mkdtemp(path.join(tmpdir(), 'sign-package-'));
 const thirdPartyLicenseDirectory = path.join(stagingDirectory, 'third-party-licenses');
 const execFileAsync = promisify(execFile);
 
@@ -88,11 +89,12 @@ try {
 
   const applicationPaths = await packager({
     afterInitialize: [applySecurityFuses],
-    appBundleId: 'me.potato4d.winzig',
+    appBundleId: `me.potato4d.${sourceManifest.name}`,
     asar: true,
     dir: stagingDirectory,
     electronVersion,
-    executableName: 'winzig',
+    executableName: sourceManifest.name,
+    extraResource: path.join(projectDirectory, 'resources', 'bin'),
     extendInfo: {
       CFBundleDocumentTypes: [
         {
@@ -103,7 +105,7 @@ try {
         },
       ],
     },
-    name: 'Winzig',
+    name: sourceManifest.productName,
     out: outputDirectory,
     overwrite: true,
     prune: false,
@@ -111,13 +113,17 @@ try {
 
   if (process.platform === 'darwin') {
     for (const applicationPath of applicationPaths) {
-      await execFileAsync('codesign', [
-        '--force',
-        '--deep',
-        '--sign',
-        '-',
-        path.join(applicationPath, 'Winzig.app'),
-      ]);
+      const applicationBundlePath = path.join(applicationPath, `${sourceManifest.productName}.app`);
+      const cliLauncherPath = path.join(
+        applicationBundlePath,
+        'Contents',
+        'Resources',
+        'bin',
+        sourceManifest.name,
+      );
+      await access(cliLauncherPath, fsConstants.X_OK);
+      await execFileAsync('/bin/sh', ['-n', cliLauncherPath]);
+      await execFileAsync('codesign', ['--force', '--deep', '--sign', '-', applicationBundlePath]);
     }
   }
 } finally {

@@ -4,15 +4,15 @@ import { isTrustedRendererUrl } from './security';
 
 describe('isTrustedRendererUrl', () => {
   it('accepts the packaged application origin', () => {
-    const entry = 'winzig://app/index.html';
+    const entry = 'sign://app/index.html';
 
-    expect(isTrustedRendererUrl('winzig://app/settings', entry)).toBe(true);
+    expect(isTrustedRendererUrl('sign://app/settings', entry)).toBe(true);
   });
 
   it('rejects a different packaged application host', () => {
-    const entry = 'winzig://app/index.html';
+    const entry = 'sign://app/index.html';
 
-    expect(isTrustedRendererUrl('winzig://other/index.html', entry)).toBe(false);
+    expect(isTrustedRendererUrl('sign://other/index.html', entry)).toBe(false);
   });
 
   it('accepts development navigation on the configured origin', () => {
@@ -29,7 +29,7 @@ describe('isTrustedRendererUrl', () => {
   });
 
   it('rejects malformed and unsupported entries', () => {
-    expect(isTrustedRendererUrl('not a url', 'winzig://app/index.html')).toBe(false);
+    expect(isTrustedRendererUrl('not a url', 'sign://app/index.html')).toBe(false);
     expect(isTrustedRendererUrl('about:blank', 'about:blank')).toBe(false);
   });
 });

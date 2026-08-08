@@ -19,6 +19,10 @@ interface LoadEditorStateOptions {
   readonly maximumFileSize?: number;
 }
 
+interface ResolveSecondInstanceFileOptions extends ResolveStartupFileOptions {
+  readonly additionalData: unknown;
+}
+
 const isRegularFile = (candidate: string): boolean => {
   try {
     return statSync(candidate).isFile();
@@ -61,6 +65,40 @@ export const resolveStartupFilePaths = ({
   }
 
   return filePaths;
+};
+
+const forwardedFilePathsFrom = (additionalData: unknown): readonly string[] | null => {
+  if (!additionalData || typeof additionalData !== 'object' || !('filePaths' in additionalData)) {
+    return null;
+  }
+
+  const { filePaths } = additionalData;
+
+  return Array.isArray(filePaths) &&
+    filePaths.every((filePath) => typeof filePath === 'string' && path.isAbsolute(filePath))
+    ? filePaths
+    : null;
+};
+
+export const resolveSecondInstanceFilePaths = ({
+  additionalData,
+  argv,
+  cwd,
+  isFile = isRegularFile,
+  isPackaged,
+}: ResolveSecondInstanceFileOptions): readonly string[] => {
+  const forwardedFilePaths = forwardedFilePathsFrom(additionalData);
+
+  if (!forwardedFilePaths) {
+    return resolveStartupFilePaths({ argv, cwd, isFile, isPackaged });
+  }
+
+  return resolveStartupFilePaths({
+    argv: [argv[0] ?? 'sign', '--', ...forwardedFilePaths],
+    cwd: path.parse(cwd).root,
+    isFile,
+    isPackaged: true,
+  });
 };
 
 const errorResult = (filePath: string, message: string): FileOpenResult => ({

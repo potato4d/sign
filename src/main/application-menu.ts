@@ -5,6 +5,10 @@ import type { EditorCommand } from '../shared/desktop-api';
 
 import { IPC_CHANNELS } from '../shared/desktop-api';
 
+interface ApplicationMenuActions {
+  readonly installCliLauncher?: () => void;
+}
+
 const commandItem = (
   label: string,
   accelerator: string,
@@ -22,7 +26,10 @@ const commandItem = (
   label,
 });
 
-export const installApplicationMenu = (mainWindow: () => BrowserWindow | null): void => {
+export const installApplicationMenu = (
+  mainWindow: () => BrowserWindow | null,
+  actions: ApplicationMenuActions = {},
+): void => {
   const fileMenu: MenuItemConstructorOptions = {
     label: 'File',
     submenu: [
@@ -96,19 +103,32 @@ export const installApplicationMenu = (mainWindow: () => BrowserWindow | null): 
   const template: MenuItemConstructorOptions[] = [fileMenu, editMenu, viewMenu, windowMenu];
 
   if (process.platform === 'darwin') {
+    const applicationSubmenu: MenuItemConstructorOptions[] = [{ role: 'about' }];
+
+    if (app.isPackaged && actions.installCliLauncher) {
+      applicationSubmenu.push(
+        { type: 'separator' },
+        {
+          click: () => actions.installCliLauncher?.(),
+          label: "Install 'sign' Command in PATH…",
+        },
+      );
+    }
+
+    applicationSubmenu.push(
+      { type: 'separator' },
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
+      { type: 'separator' },
+      { role: 'quit' },
+    );
+
     template.unshift({
       label: app.name,
-      submenu: [
-        { role: 'about' },
-        { type: 'separator' },
-        { role: 'services' },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit' },
-      ],
+      submenu: applicationSubmenu,
     });
   }
 

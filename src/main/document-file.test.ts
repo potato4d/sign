@@ -9,7 +9,7 @@ import { writeDocumentFile } from './document-file';
 const temporaryDirectories: string[] = [];
 
 const createTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'winzig-save-test-'));
+  const directory = await mkdtemp(join(tmpdir(), 'sign-save-test-'));
   temporaryDirectories.push(directory);
   return directory;
 };

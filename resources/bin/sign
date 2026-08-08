@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -eu
+
+launcher_path=$0
+
+while [ -L "$launcher_path" ]; do
+  launcher_directory=$(CDPATH= cd -P "$(dirname "$launcher_path")" && pwd)
+  link_target=$(readlink "$launcher_path")
+
+  case $link_target in
+    /*) launcher_path=$link_target ;;
+    *) launcher_path=$launcher_directory/$link_target ;;
+  esac
+done
+
+launcher_directory=$(CDPATH= cd -P "$(dirname "$launcher_path")" && pwd)
+contents_directory=$(CDPATH= cd -P "$launcher_directory/../.." && pwd)
+app_executable=$contents_directory/MacOS/sign
+
+if [ ! -x "$app_executable" ]; then
+  echo "sign: could not find the application executable at $app_executable" >&2
+  exit 1
+fi
+
+/usr/bin/nohup "$app_executable" -- "$@" </dev/null >/dev/null 2>&1 &

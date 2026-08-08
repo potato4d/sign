@@ -1,6 +1,6 @@
 {
-  "name": "winzig",
-  "productName": "Winzig",
+  "name": "sign",
+  "productName": "sign",
   "version": "0.3.1",
   "license": "MIT",
   "description": "A secure Electron and TypeScript desktop application foundation.",

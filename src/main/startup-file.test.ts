@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadFile, resolveStartupFilePaths } from './startup-file';
+import { loadFile, resolveSecondInstanceFilePaths, resolveStartupFilePaths } from './startup-file';
 
 describe('resolveStartupFilePaths', () => {
   const existingFile = '/workspace/notes/example.ts';
@@ -16,7 +16,7 @@ describe('resolveStartupFilePaths', () => {
   it('finds packaged application file arguments in order', () => {
     expect(
       resolveStartupFilePaths({
-        argv: ['/Applications/Winzig', existingFile, secondFile, existingFile],
+        argv: ['/Applications/sign', existingFile, secondFile, existingFile],
         cwd: '/workspace',
         isFile,
         isPackaged: true,
@@ -38,7 +38,7 @@ describe('resolveStartupFilePaths', () => {
   it('returns an empty list when no regular file was provided', () => {
     expect(
       resolveStartupFilePaths({
-        argv: ['/Applications/Winzig', '--no-sandbox', '/workspace/missing.ts'],
+        argv: ['/Applications/sign', '--no-sandbox', '/workspace/missing.ts'],
         cwd: '/workspace',
         isFile,
         isPackaged: true,
@@ -49,12 +49,40 @@ describe('resolveStartupFilePaths', () => {
   it('accepts extensionless and unregistered file names', () => {
     expect(
       resolveStartupFilePaths({
-        argv: ['/Applications/Winzig', extensionlessFile, unknownExtensionFile],
+        argv: ['/Applications/sign', extensionlessFile, unknownExtensionFile],
         cwd: '/workspace',
         isFile,
         isPackaged: true,
       }),
     ).toEqual([extensionlessFile, unknownExtensionFile]);
+  });
+
+  it('preserves forwarded CLI file order for a second instance', () => {
+    expect(
+      resolveSecondInstanceFilePaths({
+        additionalData: {
+          filePaths: [secondFile, existingFile, secondFile],
+        },
+        argv: ['/Applications/sign', existingFile, secondFile],
+        cwd: '/workspace',
+        isFile,
+        isPackaged: true,
+      }),
+    ).toEqual([secondFile, existingFile]);
+  });
+
+  it('falls back to process arguments when forwarded CLI data is invalid', () => {
+    expect(
+      resolveSecondInstanceFilePaths({
+        additionalData: {
+          filePaths: [existingFile, 42],
+        },
+        argv: ['/Applications/sign', secondFile],
+        cwd: '/workspace',
+        isFile,
+        isPackaged: true,
+      }),
+    ).toEqual([secondFile]);
   });
 });
 

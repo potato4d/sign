@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-export const APPLICATION_SCHEME = 'winzig';
+export const APPLICATION_SCHEME = 'sign';
 export const APPLICATION_HOST = 'app';
 export const APPLICATION_ENTRY = `${APPLICATION_SCHEME}://${APPLICATION_HOST}/index.html`;
 

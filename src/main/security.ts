@@ -1,7 +1,7 @@
 import type { BrowserWindow, Session } from 'electron';
 
 const DEVELOPMENT_PROTOCOLS = new Set(['http:', 'https:']);
-const APPLICATION_PROTOCOLS = new Set(['winzig:']);
+const APPLICATION_PROTOCOLS = new Set(['sign:']);
 
 export const isTrustedRendererUrl = (candidate: string, configuredEntry: string): boolean => {
   try {

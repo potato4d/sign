@@ -22,7 +22,7 @@ export const createMainWindow = (ipcHandlers: AppIpcHandlers): BrowserWindow => 
     minWidth: 560,
     minHeight: 360,
     show: false,
-    title: activeDocument ? `${activeDocument.fileName} — Winzig` : 'Winzig',
+    title: activeDocument ? `${activeDocument.fileName} — sign` : 'sign',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
     ...(process.platform === 'darwin'
       ? {

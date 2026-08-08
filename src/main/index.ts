@@ -13,6 +13,7 @@ import type { AppIpcHandlers } from './ipc';
 
 import { IPC_CHANNELS } from '../shared/desktop-api';
 import { installApplicationMenu } from './application-menu';
+import { CLI_LINK_PATH, CliLauncherInstallError, installCliLauncher } from './cli-launcher';
 import { createMainWindow } from './create-main-window';
 import { writeDocumentFile } from './document-file';
 import {
@@ -20,7 +21,8 @@ import {
   registerApplicationScheme,
 } from './register-application-protocol';
 import { configureSessionSecurity } from './security';
-import { loadFile, resolveStartupFilePaths } from './startup-file';
+import { secondInstanceActionFor } from './second-instance';
+import { loadFile, resolveSecondInstanceFilePaths, resolveStartupFilePaths } from './startup-file';
 import {
   EMPTY_WORKSPACE_STATE,
   activateWorkspaceDocument,
@@ -98,7 +100,7 @@ const publishWorkspaceState = (
 
   const document = activeDocument();
 
-  mainWindow.setTitle(document ? `${document.fileName} — Winzig` : 'Winzig');
+  mainWindow.setTitle(document ? `${document.fileName} — sign` : 'sign');
   if (notifyRenderer) {
     mainWindow.webContents.send(IPC_CHANNELS.workspaceStateChanged, workspaceState);
   }
@@ -344,6 +346,38 @@ const quitApplicationIfEmpty = (): boolean => {
   return true;
 };
 
+const showApplicationMessage = async (options: Electron.MessageBoxOptions): Promise<void> => {
+  if (mainWindow) {
+    await dialog.showMessageBox(mainWindow, options);
+  } else {
+    await dialog.showMessageBox(options);
+  }
+};
+
+const installCommandLineLauncher = async (): Promise<void> => {
+  try {
+    const result = await installCliLauncher();
+    const alreadyInstalled = result === 'already-installed';
+
+    await showApplicationMessage({
+      detail: `Open a new terminal and run sign <file>. The command is available at ${CLI_LINK_PATH}.`,
+      message: alreadyInstalled
+        ? "The 'sign' command is already installed."
+        : "The 'sign' command was installed.",
+      type: 'info',
+    });
+  } catch (error: unknown) {
+    await showApplicationMessage({
+      detail:
+        error instanceof CliLauncherInstallError
+          ? error.message
+          : 'An unexpected error prevented the command from being installed.',
+      message: "The 'sign' command was not installed.",
+      type: 'error',
+    });
+  }
+};
+
 const ipcHandlers: AppIpcHandlers = {
   activateDocument: (documentId) =>
     publishWorkspaceState(activateWorkspaceDocument(workspaceState, documentId)),
@@ -412,36 +446,42 @@ app.on('web-contents-created', (_event, webContents) => {
   });
 });
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const hasSingleInstanceLock = app.requestSingleInstanceLock({
+  filePaths: pendingFilePaths,
+});
 
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
-  app.on('second-instance', (_event, argv, workingDirectory) => {
-    const filePaths = resolveStartupFilePaths({
+  app.on('second-instance', (_event, argv, workingDirectory, additionalData) => {
+    const filePaths = resolveSecondInstanceFilePaths({
+      additionalData,
       argv,
       cwd: workingDirectory,
       isPackaged: app.isPackaged,
     });
+    const action = secondInstanceActionFor(filePaths, mainWindow !== null);
 
-    if (filePaths.length === 0) {
+    if (action.kind === 'focus-window') {
       focusMainWindow();
       return;
     }
 
-    if (!mainWindow) {
-      enqueuePendingFilePaths(filePaths);
-      void ensureMainWindow();
+    if (action.kind === 'ensure-window') {
+      enqueuePendingFilePaths(action.filePaths);
+      void ensureMainWindow().then(focusMainWindow);
       return;
     }
 
-    void openFilePaths(filePaths, true).then(focusMainWindow);
+    void openFilePaths(action.filePaths, true).then(focusMainWindow);
   });
 
   void app.whenReady().then(async () => {
     configureSessionSecurity(session.defaultSession);
     registerApplicationProtocol(join(__dirname, '../renderer'));
-    installApplicationMenu(() => mainWindow);
+    installApplicationMenu(() => mainWindow, {
+      installCliLauncher: () => void installCommandLineLauncher(),
+    });
     await ensureMainWindow();
 
     app.on('activate', () => {

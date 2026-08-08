@@ -173,7 +173,7 @@ const activateTabLocally = (documentId: string, focusEditor = true): void => {
     editor.restoreViewState(tab.viewState);
   }
 
-  document.title = `${openedDocument.fileName} — Winzig`;
+  document.title = `${openedDocument.fileName} — sign`;
   updateTabPresentation();
   tabButtonsByDocumentId.get(documentId)?.scrollIntoView({
     block: 'nearest',
@@ -384,7 +384,7 @@ const createTab = (document: OpenedDocument): EditorTab => {
   const uri = monaco.Uri.from({
     authority: document.documentId,
     path: `/${document.fileName}`,
-    scheme: 'winzig-document',
+    scheme: 'sign-document',
   });
   const model = monaco.editor.createModel(document.contents, 'plaintext', uri);
   const savedAlternativeVersionId = model.getAlternativeVersionId();
@@ -509,7 +509,7 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
 
   if (isEmpty) {
     synchronizeEditorModels();
-    document.title = 'Winzig';
+    document.title = 'sign';
 
     if (!wasEmpty || document.activeElement === document.body) {
       createEmptyFileButton.focus({ preventScroll: true });
@@ -518,7 +518,7 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
     const document = documentForId(state.activeDocumentId);
 
     if (document) {
-      window.document.title = `${document.fileName} — Winzig`;
+      window.document.title = `${document.fileName} — sign`;
     }
 
     if (editor) {
