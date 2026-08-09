@@ -7,6 +7,8 @@ import {
   isDroppedFilePathList,
   isEditorCommand,
   isEditorWorkspaceState,
+  isRecentFileList,
+  MAXIMUM_RECENT_FILES,
   MAXIMUM_DROPPED_FILES,
 } from './desktop-api';
 
@@ -42,6 +44,7 @@ describe('desktop API validation', () => {
 
   it('accepts only allowlisted editor commands', () => {
     expect(isEditorCommand('save-document')).toBe(true);
+    expect(isEditorCommand('toggle-recent-files')).toBe(true);
     expect(isEditorCommand('open-developer-tools')).toBe(false);
     expect(isEditorCommand({ command: 'save-document' })).toBe(false);
   });
@@ -52,6 +55,27 @@ describe('desktop API validation', () => {
     expect(isDroppedFilePathList(['/notes/one', 2])).toBe(false);
     expect(
       isDroppedFilePathList(Array.from({ length: MAXIMUM_DROPPED_FILES + 1 }, () => '/x')),
+    ).toBe(false);
+  });
+
+  it('accepts only bounded recent file lists with unique opaque ids', () => {
+    const recentFile = {
+      directoryPath: '/notes',
+      fileName: 'one.txt',
+      id: 'recent-1',
+    };
+
+    expect(isRecentFileList([recentFile])).toBe(true);
+    expect(isRecentFileList([recentFile, recentFile])).toBe(false);
+    expect(isRecentFileList([recentFile, { ...recentFile, id: 'recent-2' }])).toBe(false);
+    expect(isRecentFileList([{ ...recentFile, fileName: '' }])).toBe(false);
+    expect(
+      isRecentFileList(
+        Array.from({ length: MAXIMUM_RECENT_FILES + 1 }, (_, index) => ({
+          ...recentFile,
+          id: `recent-${index}`,
+        })),
+      ),
     ).toBe(false);
   });
 

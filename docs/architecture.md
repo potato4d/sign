@@ -10,6 +10,7 @@ future changes must preserve.
 - Make each cross-process capability explicit, typed, and small.
 - Fill the renderer with a focused Monaco editing surface.
 - Open explicitly supplied files as tabs without exposing filesystem APIs to the renderer.
+- Keep a bounded, persistent list of recently edited files without exposing generic path reads.
 - Deny navigation, new windows, embedded web views, and permissions by default.
 - Keep development and verification commands discoverable from `package.json`.
 - Add product-specific layers only when a concrete feature requires them.
@@ -53,6 +54,10 @@ only from the expected window and its main frame.
    Each model receives a stable internal URI. Language mode is inferred from the visible file name
    and updated after Save As without replacing the model.
 
+Files selected from the recent-files pane re-enter this same loading flow. Renderer entries carry
+display metadata and an opaque identifier; main resolves that identifier only against its current
+authoritative recent-file list before reading a path.
+
 When open requests overlap, every unique document is retained, but only the newest request may take
 focus or replace the visible error state.
 
@@ -81,6 +86,9 @@ focus or replace the visible error state.
 - Renderer requests activation, saving, and closure only for document identifiers already present
   in the workspace.
 - Main writes only to a path that was explicitly opened or selected in a native save dialog.
+- A successful save moves that file to the front of a versioned recent-file list stored under the
+  application user-data directory. The list is validated on load, written atomically, and capped at
+  20 entries; failed or cancelled saves do not change it.
 - Closing a modified model requires an explicit save, discard, or cancel decision.
 - Closed file-backed tabs are reloaded through the normal size and UTF-8 checks. Unsaved tabs reopen
   from their last saved in-memory state.
@@ -91,7 +99,8 @@ focus or replace the visible error state.
 - Menu actions send an allowlisted command value through the preload bridge; arbitrary command names
   are rejected.
 - Renderer key handling adds platform-specific tab aliases, including `Command-T` for a new
-  document on macOS, plus relative and direct tab selection.
+  document on macOS, `Command-\` for the recent-files pane, plus relative and direct tab
+  selection.
 - Monaco remains authoritative for text-editing bindings such as undo, search, replacement, folding,
   comments, and multiple cursors.
 - Zoom and full-screen behavior use native Electron roles.
@@ -128,8 +137,12 @@ focus or replace the visible error state.
   to the private application origin.
 - New windows and permission requests are denied until a feature defines and tests a narrower
   policy.
-- File contents come only from an explicit startup, native dialog, operating-system open, or
-  operating-system-backed drop request. Renderer code cannot request arbitrary paths.
+- File contents come only from an explicit startup, native dialog, operating-system open,
+  operating-system-backed drop, or authoritative recent-file request. Renderer code cannot request
+  arbitrary paths.
+- A recent-file request contains only an opaque identifier. Main rejects identifiers that are not
+  in its bounded in-memory list, then applies the same regular-file, size, and UTF-8 checks as every
+  other open flow.
 - Content Security Policy limits scripts and resources to the application. Development WebSocket
   connections exist only to support local rebuilds. The renderer does not receive the broader
   privileges associated with `file://` pages.
@@ -147,6 +160,7 @@ Any change that relaxes an invariant must update the code, tests, and this docum
 | CLI installation policy      | `src/main/cli-launcher.ts`             |
 | Packaged CLI entry point     | `resources/bin/sign`                   |
 | Tab state transitions        | `src/main/workspace-state.ts`          |
+| Recent-file persistence      | `src/main/recent-files.ts`             |
 | Tool versions                | `package.json` and `package-lock.json` |
 | Verification commands        | `package.json` scripts                 |
 | Packaging and security fuses | `scripts/package.mjs`                  |

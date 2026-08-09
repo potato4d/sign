@@ -11,7 +11,18 @@
     <script type="module" src="/index.ts"></script>
   </head>
   <body>
-    <header class="tab-bar" aria-label="Open files">
+    <header class="tab-bar" aria-label="Editor toolbar">
+      <button
+        id="toggle-recent-files"
+        class="side-pane-toggle"
+        type="button"
+        aria-controls="recent-files-pane"
+        aria-expanded="false"
+        aria-label="Show recent files"
+        title="Show recent files"
+      >
+        <span class="side-pane-toggle__icon" aria-hidden="true"></span>
+      </button>
       <div id="tab-list" class="tab-list" role="tablist" aria-label="Editor tabs"></div>
       <button
         id="open-files"
@@ -23,6 +34,36 @@
         <span aria-hidden="true">+</span>
       </button>
     </header>
+    <aside
+      id="recent-files-pane"
+      class="recent-files-pane"
+      aria-labelledby="recent-files-heading"
+      hidden
+    >
+      <div class="recent-files-pane__header">
+        <h2 id="recent-files-heading" class="recent-files-pane__heading">Recent Files</h2>
+        <button
+          id="close-recent-files"
+          class="recent-files-pane__close"
+          type="button"
+          aria-label="Hide recent files"
+          title="Hide recent files"
+        >
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="recent-files-pane__body">
+        <ul
+          id="recent-files-list"
+          class="recent-files-list"
+          aria-label="Recently edited files"
+          hidden
+        ></ul>
+        <p id="recent-files-empty" class="recent-files-pane__empty" role="status">
+          No recently edited files yet.
+        </p>
+      </div>
+    </aside>
     <main id="editor" aria-label="Text editor" hidden></main>
     <section id="empty-workspace" class="empty-workspace" aria-label="Start editing">
       <div class="empty-workspace__actions">

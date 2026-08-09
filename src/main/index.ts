@@ -8,14 +8,23 @@ import type {
   DocumentSaveResult,
   EditorWorkspaceState,
   OpenedDocument,
+  RecentFile,
 } from '../shared/desktop-api';
 import type { AppIpcHandlers } from './ipc';
+import type { RecentFileRecord } from './recent-files';
 
 import { IPC_CHANNELS } from '../shared/desktop-api';
 import { installApplicationMenu } from './application-menu';
 import { CLI_LINK_PATH, CliLauncherInstallError, installCliLauncher } from './cli-launcher';
 import { createMainWindow } from './create-main-window';
 import { writeDocumentFile } from './document-file';
+import {
+  findRecentFileById,
+  loadRecentFiles,
+  saveRecentFiles,
+  toRecentFileView,
+  touchRecentFile,
+} from './recent-files';
 import {
   registerApplicationProtocol,
   registerApplicationScheme,
@@ -42,6 +51,10 @@ let mainWindow: BrowserWindow | null = null;
 let openingMainWindow: Promise<void> | null = null;
 let latestOpenRequestId = 0;
 let untitledDocumentNumber = 0;
+const RECENT_FILES_STORAGE_NAME = 'recent-files.json';
+let recentFileRecords: readonly RecentFileRecord[] = [];
+let recentFilesInitialization: Promise<void> | null = null;
+let recentFilesWriteQueue: Promise<void> = Promise.resolve();
 const closedDocuments: (
   | {
       readonly document: OpenedDocument;
@@ -75,6 +88,51 @@ const activeDocument = (): EditorWorkspaceState['documents'][number] | undefined
   workspaceState.documents.find(
     (document) => document.documentId === workspaceState.activeDocumentId,
   );
+
+const recentFilesStoragePath = (): string =>
+  join(app.getPath('userData'), RECENT_FILES_STORAGE_NAME);
+
+const recentFilesForRenderer = (): readonly RecentFile[] => recentFileRecords.map(toRecentFileView);
+
+const initializeRecentFiles = (): Promise<void> => {
+  recentFilesInitialization ??= loadRecentFiles(recentFilesStoragePath())
+    .then((records) => {
+      recentFileRecords = records;
+    })
+    .catch((error: unknown) => {
+      console.error('Failed to load the recent file list.', error);
+      recentFileRecords = [];
+    });
+
+  return recentFilesInitialization;
+};
+
+const publishRecentFiles = (): void => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send(IPC_CHANNELS.recentFilesChanged, recentFilesForRenderer());
+};
+
+const persistRecentFiles = async (records: readonly RecentFileRecord[]): Promise<void> => {
+  const write = recentFilesWriteQueue.then(() =>
+    saveRecentFiles(recentFilesStoragePath(), records),
+  );
+  recentFilesWriteQueue = write.catch(() => undefined);
+
+  try {
+    await write;
+  } catch (error: unknown) {
+    console.error('Failed to persist the recent file list.', error);
+  }
+};
+
+const recordRecentEdit = async (filePath: string): Promise<void> => {
+  recentFileRecords = touchRecentFile(recentFileRecords, filePath);
+  publishRecentFiles();
+  await persistRecentFiles(recentFileRecords);
+};
 
 const focusMainWindow = (): void => {
   if (!mainWindow) {
@@ -250,12 +308,15 @@ const saveDocumentToPath = async (
     };
   }
 
+  const state = publishWorkspaceState(
+    updateSavedWorkspaceDocument(workspaceState, documentId, contents, filePath),
+  );
+  await recordRecentEdit(filePath);
+
   return {
     documentId,
     kind: 'saved',
-    state: publishWorkspaceState(
-      updateSavedWorkspaceDocument(workspaceState, documentId, contents, filePath),
-    ),
+    state,
   };
 };
 
@@ -384,9 +445,19 @@ const ipcHandlers: AppIpcHandlers = {
   closeDocument,
   confirmClose,
   createDocument,
+  getRecentFiles: recentFilesForRenderer,
   getWorkspaceState: () => workspaceState,
   openDroppedFiles: (filePaths) => openFilePaths(filePaths),
   openFiles: openFilesWithDialog,
+  openRecentFile: (recentFileId) => {
+    const recentFile = findRecentFileById(recentFileRecords, recentFileId);
+
+    if (!recentFile) {
+      throw new Error('Rejected an unknown recent file identifier.');
+    }
+
+    return openFilePaths([recentFile.filePath]);
+  },
   quitApplicationIfEmpty,
   reopenClosedDocument,
   saveDocument,
@@ -398,6 +469,8 @@ const openMainWindow = async (): Promise<void> => {
     focusMainWindow();
     return;
   }
+
+  await initializeRecentFiles();
 
   const initialFilePaths = pendingFilePaths;
   pendingFilePaths = [];
