@@ -60,6 +60,10 @@ export const resolveKeyboardShortcut = (
     return null;
   }
 
+  if (!input.shiftKey && input.code === 'Backslash') {
+    return 'toggle-recent-files';
+  }
+
   if (input.shiftKey) {
     switch (input.code) {
       case 'KeyP':

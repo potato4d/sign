@@ -32,6 +32,7 @@ that stale link, then install the command again from the menu.
 
 - Open multiple UTF-8 text files in tabs.
 - Create, edit, save, and reopen files.
+- Reopen up to 20 recently edited files from a `Command+\` side pane.
 - Open file paths passed at startup.
 - Install and launch the app from a terminal with `sign <file>`.
 - Drop files onto the window or macOS app icon, regardless of filename extension.

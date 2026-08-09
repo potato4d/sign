@@ -4,13 +4,16 @@ export const IPC_CHANNELS = {
   confirmClose: 'workspace:confirm-close',
   createDocument: 'workspace:create-document',
   editorCommand: 'editor:command',
+  getRecentFiles: 'recent-files:get',
   getWorkspaceState: 'workspace:get-state',
   openDroppedFiles: 'workspace:open-dropped-files',
   openFiles: 'workspace:open-files',
+  openRecentFile: 'recent-files:open',
   quitApplicationIfEmpty: 'application:quit-if-empty',
   reopenClosedDocument: 'workspace:reopen-closed-document',
   saveDocument: 'workspace:save-document',
   saveDocumentAs: 'workspace:save-document-as',
+  recentFilesChanged: 'recent-files:changed',
   workspaceStateChanged: 'workspace:state-changed',
 } as const;
 
@@ -35,6 +38,7 @@ export const EDITOR_COMMANDS = [
   'select-document-7',
   'select-document-8',
   'select-document-9',
+  'toggle-recent-files',
   'toggle-word-wrap',
   'undo',
 ] as const;
@@ -72,6 +76,13 @@ export type CloseDecision = 'cancel' | 'discard' | 'save';
 export type DesktopPlatform = 'darwin' | 'linux' | 'win32';
 
 export const MAXIMUM_DROPPED_FILES = 256;
+export const MAXIMUM_RECENT_FILES = 20;
+
+export interface RecentFile {
+  readonly directoryPath: string;
+  readonly fileName: string;
+  readonly id: string;
+}
 
 export type DocumentSaveResult =
   | {
@@ -94,11 +105,14 @@ export interface DesktopApi {
   closeDocument(documentId: string): Promise<EditorWorkspaceState>;
   confirmClose(documentId: string): Promise<CloseDecision>;
   createDocument(): Promise<EditorWorkspaceState>;
+  getRecentFiles(): Promise<readonly RecentFile[]>;
   getWorkspaceState(): Promise<EditorWorkspaceState>;
   onEditorCommand(listener: (command: EditorCommand) => void): () => void;
+  onRecentFilesChanged(listener: (recentFiles: readonly RecentFile[]) => void): () => void;
   onWorkspaceStateChanged(listener: (state: EditorWorkspaceState) => void): () => void;
   openDroppedFiles(files: readonly unknown[]): Promise<EditorWorkspaceState>;
   openFiles(): Promise<EditorWorkspaceState>;
+  openRecentFile(recentFileId: string): Promise<EditorWorkspaceState>;
   readonly platform: DesktopPlatform;
   quitApplicationIfEmpty(): Promise<boolean>;
   reopenClosedDocument(): Promise<EditorWorkspaceState>;
@@ -115,6 +129,31 @@ export const isDroppedFilePathList = (value: unknown): value is readonly string[
   value.every(
     (filePath) => typeof filePath === 'string' && filePath.length > 0 && !filePath.includes('\0'),
   );
+
+const isRecentFile = (value: unknown): value is RecentFile =>
+  isRecord(value) &&
+  typeof value['directoryPath'] === 'string' &&
+  value['directoryPath'].length > 0 &&
+  !value['directoryPath'].includes('\0') &&
+  typeof value['fileName'] === 'string' &&
+  value['fileName'].length > 0 &&
+  !value['fileName'].includes('\0') &&
+  typeof value['id'] === 'string' &&
+  value['id'].length > 0 &&
+  !value['id'].includes('\0');
+
+export const isRecentFileList = (value: unknown): value is readonly RecentFile[] => {
+  if (!Array.isArray(value) || value.length > MAXIMUM_RECENT_FILES || !value.every(isRecentFile)) {
+    return false;
+  }
+
+  const ids = new Set(value.map((recentFile) => recentFile.id));
+  const displayPaths = new Set(
+    value.map((recentFile) => `${recentFile.directoryPath}\0${recentFile.fileName}`),
+  );
+
+  return ids.size === value.length && displayPaths.size === value.length;
+};
 
 const isOpenedDocument = (value: unknown): value is OpenedDocument => {
   if (!isRecord(value)) {

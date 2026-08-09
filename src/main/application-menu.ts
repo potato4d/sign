@@ -80,6 +80,8 @@ export const installApplicationMenu = (
       commandItem('Quick Switcher…', 'CmdOrCtrl+P', 'quick-switcher', mainWindow),
       commandItem('Command Palette…', 'CmdOrCtrl+Shift+P', 'command-palette', mainWindow),
       { type: 'separator' },
+      commandItem('Toggle Recent Files', 'CmdOrCtrl+\\', 'toggle-recent-files', mainWindow),
+      { type: 'separator' },
       commandItem('Next Editor', 'Ctrl+Tab', 'next-document', mainWindow),
       commandItem('Previous Editor', 'Ctrl+Shift+Tab', 'previous-document', mainWindow),
       {

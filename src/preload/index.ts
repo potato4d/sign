@@ -9,6 +9,7 @@ import type {
   DocumentSaveResult,
   EditorCommand,
   EditorWorkspaceState,
+  RecentFile,
 } from '../shared/desktop-api';
 
 import {
@@ -18,6 +19,7 @@ import {
   isDocumentSaveResult,
   isEditorCommand,
   isEditorWorkspaceState,
+  isRecentFileList,
 } from '../shared/desktop-api';
 
 const invokeWorkspaceState = async (
@@ -45,6 +47,16 @@ const invokeSave = async (
   }
 
   return result;
+};
+
+const invokeRecentFiles = async (): Promise<readonly RecentFile[]> => {
+  const recentFiles: unknown = await ipcRenderer.invoke(IPC_CHANNELS.getRecentFiles);
+
+  if (!isRecentFileList(recentFiles)) {
+    throw new TypeError('The main process returned an invalid recent file list.');
+  }
+
+  return recentFiles;
 };
 
 const pathsForDroppedFiles = (files: readonly unknown[]): readonly string[] => {
@@ -80,6 +92,7 @@ const desktopApi: DesktopApi = Object.freeze({
     return decision;
   },
   createDocument: () => invokeWorkspaceState(IPC_CHANNELS.createDocument),
+  getRecentFiles: invokeRecentFiles,
   getWorkspaceState: () => invokeWorkspaceState(IPC_CHANNELS.getWorkspaceState),
   onEditorCommand: (listener: (command: EditorCommand) => void) => {
     const handleCommand = (_event: Electron.IpcRendererEvent, command: unknown): void => {
@@ -92,6 +105,22 @@ const desktopApi: DesktopApi = Object.freeze({
 
     return () => {
       ipcRenderer.removeListener(IPC_CHANNELS.editorCommand, handleCommand);
+    };
+  },
+  onRecentFilesChanged: (listener: (recentFiles: readonly RecentFile[]) => void) => {
+    const handleRecentFilesChanged = (
+      _event: Electron.IpcRendererEvent,
+      recentFiles: unknown,
+    ): void => {
+      if (isRecentFileList(recentFiles)) {
+        listener(recentFiles);
+      }
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.recentFilesChanged, handleRecentFilesChanged);
+
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.recentFilesChanged, handleRecentFilesChanged);
     };
   },
   onWorkspaceStateChanged: (listener: (state: EditorWorkspaceState) => void) => {
@@ -110,6 +139,8 @@ const desktopApi: DesktopApi = Object.freeze({
   openDroppedFiles: (files: readonly unknown[]) =>
     invokeWorkspaceState(IPC_CHANNELS.openDroppedFiles, pathsForDroppedFiles(files)),
   openFiles: () => invokeWorkspaceState(IPC_CHANNELS.openFiles),
+  openRecentFile: (recentFileId: string) =>
+    invokeWorkspaceState(IPC_CHANNELS.openRecentFile, recentFileId),
   platform: (process.platform === 'darwin' || process.platform === 'win32'
     ? process.platform
     : 'linux') satisfies DesktopPlatform,

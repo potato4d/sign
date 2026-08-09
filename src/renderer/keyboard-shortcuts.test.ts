@@ -39,6 +39,7 @@ describe('resolveKeyboardShortcut', () => {
 
   it('does not treat the macOS Control key as the primary modifier', () => {
     expect(resolve('KeyO', { ctrlKey: true }, 'macos')).toBeNull();
+    expect(resolve('Backslash', { ctrlKey: true }, 'macos')).toBeNull();
     expect(resolve('KeyO', { metaKey: true }, 'macos')).toBe('open-files');
   });
 
@@ -46,6 +47,8 @@ describe('resolveKeyboardShortcut', () => {
     expect(resolve('KeyP', { ctrlKey: true })).toBe('quick-switcher');
     expect(resolve('KeyP', { ctrlKey: true, shiftKey: true })).toBe('command-palette');
     expect(resolve('KeyZ', { altKey: true })).toBe('toggle-word-wrap');
+    expect(resolve('Backslash', { ctrlKey: true })).toBe('toggle-recent-files');
+    expect(resolve('Backslash', { metaKey: true }, 'macos')).toBe('toggle-recent-files');
   });
 
   it('maps direct and relative tab navigation aliases', () => {
@@ -65,5 +68,8 @@ describe('resolveKeyboardShortcut', () => {
     expect(resolve('KeyS', {})).toBeNull();
     expect(resolve('KeyS', { altKey: true, ctrlKey: true })).toBeNull();
     expect(resolve('KeyS', { ctrlKey: true, repeat: true })).toBeNull();
+    expect(resolve('Backslash', { altKey: true, ctrlKey: true })).toBeNull();
+    expect(resolve('Backslash', { ctrlKey: true, shiftKey: true })).toBeNull();
+    expect(resolve('Backslash', { ctrlKey: true, repeat: true })).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import type {
   CloseDecision,
   DocumentSaveResult,
   EditorWorkspaceState,
+  RecentFile,
 } from '../shared/desktop-api';
 
 import { IPC_CHANNELS, isDroppedFilePathList } from '../shared/desktop-api';
@@ -17,9 +18,11 @@ export interface AppIpcHandlers {
   readonly closeDocument: (documentId: string) => EditorWorkspaceState;
   readonly confirmClose: (documentId: string) => Promise<CloseDecision>;
   readonly createDocument: () => EditorWorkspaceState;
+  readonly getRecentFiles: () => readonly RecentFile[];
   readonly getWorkspaceState: () => EditorWorkspaceState;
   readonly openDroppedFiles: (filePaths: readonly string[]) => Promise<EditorWorkspaceState>;
   readonly openFiles: () => Promise<EditorWorkspaceState>;
+  readonly openRecentFile: (recentFileId: string) => Promise<EditorWorkspaceState>;
   readonly quitApplicationIfEmpty: () => boolean;
   readonly reopenClosedDocument: () => Promise<EditorWorkspaceState>;
   readonly saveDocument: (documentId: string, contents: string) => Promise<DocumentSaveResult>;
@@ -65,10 +68,23 @@ export const registerAppIpc = (
     return handlers.getWorkspaceState();
   });
 
+  ipcMain.handle(IPC_CHANNELS.getRecentFiles, (event): readonly RecentFile[] => {
+    assertExpectedSender(event, mainWindow);
+    return handlers.getRecentFiles();
+  });
+
   ipcMain.handle(IPC_CHANNELS.openFiles, async (event): Promise<EditorWorkspaceState> => {
     assertExpectedSender(event, mainWindow);
     return handlers.openFiles();
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.openRecentFile,
+    async (event, recentFileId: unknown): Promise<EditorWorkspaceState> => {
+      assertExpectedSender(event, mainWindow);
+      return handlers.openRecentFile(requireString(recentFileId));
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.openDroppedFiles,
@@ -136,7 +152,9 @@ export const registerAppIpc = (
     ipcMain.removeHandler(IPC_CHANNELS.confirmClose);
     ipcMain.removeHandler(IPC_CHANNELS.createDocument);
     ipcMain.removeHandler(IPC_CHANNELS.getWorkspaceState);
+    ipcMain.removeHandler(IPC_CHANNELS.getRecentFiles);
     ipcMain.removeHandler(IPC_CHANNELS.openFiles);
+    ipcMain.removeHandler(IPC_CHANNELS.openRecentFile);
     ipcMain.removeHandler(IPC_CHANNELS.openDroppedFiles);
     ipcMain.removeHandler(IPC_CHANNELS.quitApplicationIfEmpty);
     ipcMain.removeHandler(IPC_CHANNELS.reopenClosedDocument);

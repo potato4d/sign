@@ -1,8 +1,14 @@
 import './styles.css';
 
-import type { EditorCommand, EditorWorkspaceState, OpenedDocument } from '../shared/desktop-api';
+import type {
+  EditorCommand,
+  EditorWorkspaceState,
+  OpenedDocument,
+  RecentFile,
+} from '../shared/desktop-api';
 import type * as Monaco from 'monaco-editor';
 
+import { MAXIMUM_RECENT_FILES } from '../shared/desktop-api';
 import { resolveKeyboardShortcut } from './keyboard-shortcuts';
 
 interface EditorTab {
@@ -24,6 +30,7 @@ const requireElement = <ElementType extends Element>(selector: string): ElementT
 
 const editorElement = requireElement<HTMLElement>('#editor');
 const emptyWorkspaceElement = requireElement<HTMLElement>('#empty-workspace');
+const closeRecentFilesButton = requireElement<HTMLButtonElement>('#close-recent-files');
 const createEmptyFileButton = requireElement<HTMLButtonElement>('#create-empty-file');
 const dropOverlayElement = requireElement<HTMLDivElement>('#drop-overlay');
 const openEmptyFileButton = requireElement<HTMLButtonElement>('#open-empty-file');
@@ -32,7 +39,11 @@ const openFilesButton = requireElement<HTMLButtonElement>('#open-files');
 const quickSwitcherElement = requireElement<HTMLDialogElement>('#quick-switcher');
 const quickSwitcherInput = requireElement<HTMLInputElement>('#quick-switcher-input');
 const quickSwitcherResults = requireElement<HTMLDivElement>('#quick-switcher-results');
+const recentFilesEmptyElement = requireElement<HTMLParagraphElement>('#recent-files-empty');
+const recentFilesListElement = requireElement<HTMLUListElement>('#recent-files-list');
+const recentFilesPaneElement = requireElement<HTMLElement>('#recent-files-pane');
 const tabListElement = requireElement<HTMLDivElement>('#tab-list');
+const toggleRecentFilesButton = requireElement<HTMLButtonElement>('#toggle-recent-files');
 
 const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
 const highContrast = window.matchMedia('(prefers-contrast: more)');
@@ -40,12 +51,16 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const tabsByDocumentId = new Map<string, EditorTab>();
 const tabButtonsByDocumentId = new Map<string, HTMLButtonElement>();
 const shortcutPlatform = window.desktop.platform === 'darwin' ? 'macos' : 'other';
+const filePathSeparator = window.desktop.platform === 'win32' ? '\\' : '/';
 let editor: Monaco.editor.IStandaloneCodeEditor | null = null;
 let fileDragDepth = 0;
 let editorInitialization: Promise<void> | null = null;
 let monaco: typeof Monaco | null = null;
 let quickSwitcherDocumentIds: string[] = [];
 let quickSwitcherSelection = 0;
+let recentFiles: readonly RecentFile[] = [];
+let recentFilesLoadFailed = false;
+let recentFilesVisible = false;
 let wordWrapEnabled = false;
 let workspaceState: EditorWorkspaceState = {
   activeDocumentId: null,
@@ -94,6 +109,124 @@ const openDroppedFiles = async (files: readonly File[]): Promise<void> => {
 
 const documentForId = (documentId: string | null): OpenedDocument | undefined =>
   workspaceState.documents.find((document) => document.documentId === documentId);
+
+const normalizeFilePathForComparison = (filePath: string): string =>
+  window.desktop.platform === 'win32' ? filePath.replaceAll('/', '\\') : filePath;
+
+const fullPathForRecentFile = (recentFile: RecentFile): string => {
+  const separator = recentFile.directoryPath.endsWith(filePathSeparator) ? '' : filePathSeparator;
+
+  return `${recentFile.directoryPath}${separator}${recentFile.fileName}`;
+};
+
+const abbreviatedDirectoryPath = (directoryPath: string): string => {
+  const segments = directoryPath.split(filePathSeparator).filter(Boolean);
+
+  return segments.length > 2
+    ? `…${filePathSeparator}${segments.slice(-2).join(filePathSeparator)}`
+    : directoryPath;
+};
+
+const isActiveRecentFile = (recentFile: RecentFile): boolean => {
+  const activeDocument = documentForId(workspaceState.activeDocumentId);
+
+  return Boolean(
+    activeDocument?.filePath &&
+    normalizeFilePathForComparison(activeDocument.filePath) ===
+      normalizeFilePathForComparison(fullPathForRecentFile(recentFile)),
+  );
+};
+
+const applyRecentFiles = (nextRecentFiles: readonly RecentFile[]): void => {
+  recentFiles = nextRecentFiles.slice(0, MAXIMUM_RECENT_FILES);
+  recentFilesLoadFailed = false;
+  renderRecentFiles();
+};
+
+async function openRecentFile(recentFileId: string): Promise<void> {
+  try {
+    applyWorkspaceState(await window.desktop.openRecentFile(recentFileId));
+  } catch {
+    showNotice('The recent file could not be opened.');
+  }
+}
+
+function renderRecentFiles(): void {
+  const fragment = document.createDocumentFragment();
+
+  for (const recentFile of recentFiles) {
+    const item = window.document.createElement('li');
+    const button = window.document.createElement('button');
+    const name = window.document.createElement('span');
+    const directory = window.document.createElement('span');
+    const isActive = isActiveRecentFile(recentFile);
+
+    item.className = 'recent-files-list__item';
+    button.className = 'recent-file';
+    button.type = 'button';
+    button.title = fullPathForRecentFile(recentFile);
+    button.setAttribute(
+      'aria-label',
+      `${recentFile.fileName}, ${recentFile.directoryPath}${isActive ? ', current file' : ''}`,
+    );
+
+    if (isActive) {
+      button.setAttribute('aria-current', 'page');
+    }
+
+    name.className = 'recent-file__name';
+    name.textContent = recentFile.fileName;
+    directory.className = 'recent-file__directory';
+    directory.textContent = abbreviatedDirectoryPath(recentFile.directoryPath);
+
+    button.append(name, directory);
+    button.addEventListener('click', () => {
+      void openRecentFile(recentFile.id);
+    });
+    item.append(button);
+    fragment.append(item);
+  }
+
+  recentFilesListElement.replaceChildren(fragment);
+  recentFilesListElement.hidden = recentFiles.length === 0;
+  recentFilesEmptyElement.hidden = recentFiles.length > 0;
+  recentFilesEmptyElement.textContent = recentFilesLoadFailed
+    ? 'Recent files could not be loaded.'
+    : 'No recently edited files yet.';
+}
+
+const updateRecentFilesTogglePresentation = (): void => {
+  const action = recentFilesVisible ? 'Hide' : 'Show';
+  const shortcutLabel = shortcutPlatform === 'macos' ? '⌘\\' : 'Ctrl+\\';
+  const ariaShortcut = shortcutPlatform === 'macos' ? 'Meta+\\' : 'Control+\\';
+
+  toggleRecentFilesButton.setAttribute('aria-expanded', String(recentFilesVisible));
+  toggleRecentFilesButton.setAttribute('aria-keyshortcuts', ariaShortcut);
+  toggleRecentFilesButton.setAttribute('aria-label', `${action} recent files`);
+  toggleRecentFilesButton.title = `${action} recent files (${shortcutLabel})`;
+};
+
+const setRecentFilesVisible = (isVisible: boolean): void => {
+  const shouldRestoreFocus =
+    !isVisible && recentFilesPaneElement.contains(window.document.activeElement);
+
+  recentFilesVisible = isVisible;
+  recentFilesPaneElement.hidden = !isVisible;
+  document.body.classList.toggle('recent-files-visible', isVisible);
+  updateRecentFilesTogglePresentation();
+
+  if (shouldRestoreFocus) {
+    toggleRecentFilesButton.focus({ preventScroll: true });
+  }
+
+  window.requestAnimationFrame(() => {
+    editor?.layout();
+  });
+};
+
+const toggleRecentFiles = (): void => {
+  setRecentFilesVisible(!recentFilesVisible);
+};
 
 const isTabDirty = (tab: EditorTab): boolean =>
   tab.model.getAlternativeVersionId() !== tab.savedAlternativeVersionId;
@@ -175,6 +308,7 @@ const activateTabLocally = (documentId: string, focusEditor = true): void => {
 
   document.title = `${openedDocument.fileName} — sign`;
   updateTabPresentation();
+  renderRecentFiles();
   tabButtonsByDocumentId.get(documentId)?.scrollIntoView({
     block: 'nearest',
     inline: 'nearest',
@@ -503,6 +637,7 @@ const applyWorkspaceState = (state: EditorWorkspaceState): void => {
   const isEmpty = state.documents.length === 0;
 
   renderTabs();
+  renderRecentFiles();
   document.body.classList.toggle('workspace-empty', isEmpty);
   emptyWorkspaceElement.hidden = !isEmpty;
   editorElement.hidden = isEmpty;
@@ -742,6 +877,9 @@ const runEditorCommand = (command: EditorCommand): void => {
     case 'save-document-as':
       void saveActiveDocument(true);
       break;
+    case 'toggle-recent-files':
+      toggleRecentFiles();
+      break;
     case 'toggle-word-wrap':
       toggleWordWrap();
       break;
@@ -763,6 +901,16 @@ const updateMotionPreferences = (): void => {
 
 openFilesButton.addEventListener('click', () => {
   void openFiles();
+});
+toggleRecentFilesButton.addEventListener('click', toggleRecentFiles);
+closeRecentFilesButton.addEventListener('click', () => {
+  setRecentFilesVisible(false);
+});
+recentFilesPaneElement.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    setRecentFilesVisible(false);
+  }
 });
 createEmptyFileButton.addEventListener('click', () => {
   void createDocument();
@@ -870,6 +1018,7 @@ highContrast.addEventListener('change', updateTheme);
 reducedMotion.addEventListener('change', updateMotionPreferences);
 
 const disposeEditorCommandListener = window.desktop.onEditorCommand(runEditorCommand);
+const disposeRecentFilesListener = window.desktop.onRecentFilesChanged(applyRecentFiles);
 const disposeWorkspaceStateListener = window.desktop.onWorkspaceStateChanged(applyWorkspaceState);
 
 const initializeEditor = async (): Promise<void> => {
@@ -880,8 +1029,21 @@ const initializeEditor = async (): Promise<void> => {
   }
 };
 
+const initializeRecentFiles = async (): Promise<void> => {
+  try {
+    applyRecentFiles(await window.desktop.getRecentFiles());
+  } catch {
+    recentFilesLoadFailed = true;
+    renderRecentFiles();
+  }
+};
+
+updateRecentFilesTogglePresentation();
+renderRecentFiles();
+
 window.addEventListener('beforeunload', () => {
   disposeEditorCommandListener();
+  disposeRecentFilesListener();
   disposeWorkspaceStateListener();
   darkMode.removeEventListener('change', updateTheme);
   highContrast.removeEventListener('change', updateTheme);
@@ -896,3 +1058,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 void initializeEditor();
+void initializeRecentFiles();
