@@ -271,7 +271,7 @@ body.workspace-empty .open-files {
   align-items: center;
   min-width: 0;
   min-height: 2.25rem;
-  padding: 0.25rem 0.35rem 0.25rem 0.7rem;
+  padding: 0.25rem 0.7rem;
   border-bottom: 1px solid var(--chrome-border);
 }
 
@@ -287,29 +287,10 @@ body.workspace-empty .open-files {
   white-space: nowrap;
 }
 
-.recent-files-pane__close {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-  color: var(--chrome-text-muted);
-  appearance: none;
-  background: transparent;
-  border: 0;
-  border-radius: 0.35rem;
-  cursor: default;
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.recent-files-pane__close:hover,
 .recent-file:hover {
   background: var(--chrome-hover);
 }
 
-.recent-files-pane__close:active,
 .recent-file:active {
   background: var(--chrome-pressed);
 }
@@ -351,7 +332,8 @@ body.workspace-empty .open-files {
 
 .recent-file[aria-current='page'] {
   background: var(--selection);
-  box-shadow: inset 2px 0 Highlight;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .recent-file[aria-current='page']:active {
@@ -387,17 +369,45 @@ body.workspace-empty .open-files {
   text-align: center;
 }
 
+.empty-workspace__content {
+  display: grid;
+  gap: 1.4rem;
+  place-items: center;
+  padding: 2rem;
+}
+
+.empty-workspace__brand {
+  display: grid;
+  gap: 0.55rem;
+  place-items: center;
+}
+
+.empty-workspace__brand-icon {
+  display: block;
+  width: 4.75rem;
+  height: 4.75rem;
+  object-fit: contain;
+}
+
+.empty-workspace__brand-name {
+  margin: 0;
+  color: var(--chrome-text);
+  font-size: 1.1rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+
 .empty-workspace__actions {
   display: flex;
   gap: clamp(0.75rem, 3vw, 1.25rem);
   align-items: stretch;
   justify-content: center;
-  padding: 1.5rem;
 }
 
 .empty-workspace__action {
   display: grid;
-  grid-template-rows: 2.5rem auto;
+  grid-template-rows: 2.75rem auto;
   gap: 0.6rem;
   place-items: center;
   width: clamp(7.5rem, 18vw, 9rem);
@@ -426,6 +436,10 @@ body.workspace-empty .open-files {
 }
 
 .empty-workspace__icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
   font-size: 2rem;
   font-weight: 500;
   line-height: 1;
@@ -434,6 +448,10 @@ body.workspace-empty .open-files {
 .empty-workspace__icon--new {
   font-size: 2.35rem;
   font-weight: 300;
+}
+
+.empty-workspace__icon--open {
+  object-fit: contain;
 }
 
 .drop-overlay {
