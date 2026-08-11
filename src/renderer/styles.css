@@ -378,14 +378,20 @@ body.workspace-empty .open-files {
 
 .empty-workspace__brand {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.3rem;
   place-items: center;
 }
 
 .empty-workspace__brand-icon {
   display: block;
-  width: 4.75rem;
-  height: 4.75rem;
+  width: 4rem;
+  height: 4rem;
+}
+
+.empty-workspace__brand-icon-image {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
@@ -407,7 +413,7 @@ body.workspace-empty .open-files {
 
 .empty-workspace__action {
   display: grid;
-  grid-template-rows: 2.75rem auto;
+  grid-template-rows: 2.5rem auto;
   gap: 0.6rem;
   place-items: center;
   width: clamp(7.5rem, 18vw, 9rem);
@@ -436,21 +442,15 @@ body.workspace-empty .open-files {
 }
 
 .empty-workspace__icon {
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  font-size: 2rem;
-  font-weight: 500;
-  line-height: 1;
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
-.empty-workspace__icon--new {
-  font-size: 2.35rem;
-  font-weight: 300;
-}
-
-.empty-workspace__icon--open {
+.empty-workspace__icon-image {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
