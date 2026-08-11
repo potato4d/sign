@@ -70,23 +70,29 @@
         </div>
         <div class="empty-workspace__actions">
           <button id="create-empty-file" class="empty-workspace__action" type="button">
-            <img
-              class="empty-workspace__icon"
-              src="./assets/new-file.png"
-              width="256"
-              height="256"
-              alt=""
-            />
+            <picture class="empty-workspace__icon">
+              <source media="(prefers-color-scheme: dark)" srcset="./assets/new-file.png" />
+              <img
+                class="empty-workspace__icon-image"
+                src="./assets/new-file-light.png"
+                width="256"
+                height="256"
+                alt=""
+              />
+            </picture>
             <span>New File</span>
           </button>
           <button id="open-empty-file" class="empty-workspace__action" type="button">
-            <img
-              class="empty-workspace__icon"
-              src="./assets/open-file.png"
-              width="256"
-              height="256"
-              alt=""
-            />
+            <picture class="empty-workspace__icon">
+              <source media="(prefers-color-scheme: dark)" srcset="./assets/open-file.png" />
+              <img
+                class="empty-workspace__icon-image"
+                src="./assets/open-file-light.png"
+                width="256"
+                height="256"
+                alt=""
+              />
+            </picture>
             <span>Open File</span>
           </button>
         </div>
