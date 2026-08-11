@@ -42,15 +42,6 @@
     >
       <div class="recent-files-pane__header">
         <h2 id="recent-files-heading" class="recent-files-pane__heading">Recent Files</h2>
-        <button
-          id="close-recent-files"
-          class="recent-files-pane__close"
-          type="button"
-          aria-label="Hide recent files"
-          title="Hide recent files"
-        >
-          <span aria-hidden="true">&times;</span>
-        </button>
       </div>
       <div class="recent-files-pane__body">
         <ul
@@ -66,17 +57,35 @@
     </aside>
     <main id="editor" aria-label="Text editor" hidden></main>
     <section id="empty-workspace" class="empty-workspace" aria-label="Start editing">
-      <div class="empty-workspace__actions">
-        <button id="create-empty-file" class="empty-workspace__action" type="button">
-          <span class="empty-workspace__icon empty-workspace__icon--new" aria-hidden="true"
-            >＋</span
-          >
-          <span>New File</span>
-        </button>
-        <button id="open-empty-file" class="empty-workspace__action" type="button">
-          <span class="empty-workspace__icon" aria-hidden="true">📁</span>
-          <span>Open File</span>
-        </button>
+      <div class="empty-workspace__content">
+        <div class="empty-workspace__brand">
+          <img
+            class="empty-workspace__brand-icon"
+            src="./assets/app-icon.png"
+            width="128"
+            height="128"
+            alt=""
+          />
+          <h1 class="empty-workspace__brand-name">sign</h1>
+        </div>
+        <div class="empty-workspace__actions">
+          <button id="create-empty-file" class="empty-workspace__action" type="button">
+            <span class="empty-workspace__icon empty-workspace__icon--new" aria-hidden="true"
+              >＋</span
+            >
+            <span>New File</span>
+          </button>
+          <button id="open-empty-file" class="empty-workspace__action" type="button">
+            <img
+              class="empty-workspace__icon empty-workspace__icon--open"
+              src="./assets/open-file.png"
+              width="256"
+              height="256"
+              alt=""
+            />
+            <span>Open File</span>
+          </button>
+        </div>
       </div>
     </section>
     <div id="drop-overlay" class="drop-overlay" role="status" aria-live="polite" aria-hidden="true">

@@ -30,7 +30,6 @@ const requireElement = <ElementType extends Element>(selector: string): ElementT
 
 const editorElement = requireElement<HTMLElement>('#editor');
 const emptyWorkspaceElement = requireElement<HTMLElement>('#empty-workspace');
-const closeRecentFilesButton = requireElement<HTMLButtonElement>('#close-recent-files');
 const createEmptyFileButton = requireElement<HTMLButtonElement>('#create-empty-file');
 const dropOverlayElement = requireElement<HTMLDivElement>('#drop-overlay');
 const openEmptyFileButton = requireElement<HTMLButtonElement>('#open-empty-file');
@@ -903,9 +902,6 @@ openFilesButton.addEventListener('click', () => {
   void openFiles();
 });
 toggleRecentFilesButton.addEventListener('click', toggleRecentFiles);
-closeRecentFilesButton.addEventListener('click', () => {
-  setRecentFilesVisible(false);
-});
 recentFilesPaneElement.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     event.preventDefault();
