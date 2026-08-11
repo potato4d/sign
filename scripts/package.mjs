@@ -95,6 +95,7 @@ try {
     electronVersion,
     executableName: sourceManifest.name,
     extraResource: path.join(projectDirectory, 'resources', 'bin'),
+    icon: path.join(projectDirectory, 'resources', 'app-icon.icns'),
     extendInfo: {
       CFBundleDocumentTypes: [
         {
