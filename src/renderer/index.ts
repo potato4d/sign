@@ -7,14 +7,16 @@ import type {
   RecentFile,
 } from '../shared/desktop-api';
 import type * as Monaco from 'monaco-editor';
+import type { DocumentSnapshot } from './document-changes';
 
 import { MAXIMUM_RECENT_FILES } from '../shared/desktop-api';
+import { captureDocumentSnapshot, isDocumentDirty } from './document-changes';
 import { resolveKeyboardShortcut } from './keyboard-shortcuts';
 
 interface EditorTab {
   readonly contentListener: Monaco.IDisposable;
   readonly model: Monaco.editor.ITextModel;
-  savedAlternativeVersionId: number;
+  savedSnapshot: DocumentSnapshot;
   viewState: Monaco.editor.ICodeEditorViewState | null;
 }
 
@@ -227,8 +229,7 @@ const toggleRecentFiles = (): void => {
   setRecentFilesVisible(!recentFilesVisible);
 };
 
-const isTabDirty = (tab: EditorTab): boolean =>
-  tab.model.getAlternativeVersionId() !== tab.savedAlternativeVersionId;
+const isTabDirty = (tab: EditorTab): boolean => isDocumentDirty(tab.model, tab.savedSnapshot);
 
 const saveViewState = (documentId: string | null): void => {
   if (!documentId || !editor) {
@@ -368,13 +369,12 @@ const saveDocument = async (documentId: string, saveAs = false): Promise<boolean
     return false;
   }
 
-  const contents = tab.model.getValue();
-  const savedAlternativeVersionId = tab.model.getAlternativeVersionId();
+  const snapshot = captureDocumentSnapshot(tab.model);
 
   try {
     const result = saveAs
-      ? await window.desktop.saveDocumentAs(documentId, contents)
-      : await window.desktop.saveDocument(documentId, contents);
+      ? await window.desktop.saveDocumentAs(documentId, snapshot.contents)
+      : await window.desktop.saveDocument(documentId, snapshot.contents);
 
     if (result.kind === 'cancelled') {
       return false;
@@ -385,7 +385,7 @@ const saveDocument = async (documentId: string, saveAs = false): Promise<boolean
       return false;
     }
 
-    tab.savedAlternativeVersionId = savedAlternativeVersionId;
+    tab.savedSnapshot = snapshot;
     applyWorkspaceState(result.state);
     hideNotice();
     return true;
@@ -520,7 +520,7 @@ const createTab = (document: OpenedDocument): EditorTab => {
     scheme: 'sign-document',
   });
   const model = monaco.editor.createModel(document.contents, 'plaintext', uri);
-  const savedAlternativeVersionId = model.getAlternativeVersionId();
+  const savedSnapshot = captureDocumentSnapshot(model);
   const contentListener = model.onDidChangeContent(() => {
     updateTabPresentationForDocument(document.documentId);
   });
@@ -528,7 +528,7 @@ const createTab = (document: OpenedDocument): EditorTab => {
   const tab = {
     contentListener,
     model,
-    savedAlternativeVersionId,
+    savedSnapshot,
     viewState: null,
   };
 
