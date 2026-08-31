@@ -73,7 +73,7 @@ button:focus-visible {
   display: flex;
   min-width: 0;
   color: var(--chrome-text);
-  background: var(--chrome);
+  background: var(--page);
   border-bottom: 1px solid var(--chrome-border);
   user-select: none;
   -webkit-app-region: drag;
