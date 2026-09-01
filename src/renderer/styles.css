@@ -79,11 +79,22 @@ button:focus-visible {
 }
 
 body.recent-files-visible .tab-bar {
-  background: linear-gradient(
-    to right,
-    var(--chrome) 0 var(--side-pane-width),
-    var(--page) var(--side-pane-width) 100%
-  );
+  position: relative;
+}
+
+body.recent-files-visible .tab-bar::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0 auto 0 0;
+  width: var(--side-pane-width);
+  pointer-events: none;
+  content: '';
+  background: var(--chrome);
+}
+
+body.recent-files-visible .tab-bar > * {
+  position: relative;
+  z-index: 1;
 }
 
 body.recent-files-visible .side-pane-toggle {
