@@ -4,7 +4,7 @@ A small desktop text editor built with Electron, TypeScript, and Monaco Editor.
 
 ## Installation
 
-sign `0.3.6` supports Macs with Apple silicon running macOS 12 or later.
+sign `0.3.7` supports Macs with Apple silicon running macOS 12 or later.
 
 ```sh
 brew install --cask potato4d/tap/sign
@@ -67,7 +67,7 @@ Architecture and security notes are available in
 
 ## Release
 
-The current release is `0.3.6`.
+The current release is `0.3.7`.
 
 ## License
 

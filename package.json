@@ -1,7 +1,7 @@
 {
   "name": "sign",
   "productName": "sign",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "license": "MIT",
   "description": "A secure Electron and TypeScript desktop application foundation.",
   "main": "./out/main/index.js",
