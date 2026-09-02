@@ -212,7 +212,8 @@ const setRecentFilesVisible = (isVisible: boolean): void => {
     !isVisible && recentFilesPaneElement.contains(window.document.activeElement);
 
   recentFilesVisible = isVisible;
-  recentFilesPaneElement.hidden = !isVisible;
+  recentFilesPaneElement.inert = !isVisible;
+  recentFilesPaneElement.setAttribute('aria-hidden', String(!isVisible));
   document.body.classList.toggle('recent-files-visible', isVisible);
   updateRecentFilesTogglePresentation();
 

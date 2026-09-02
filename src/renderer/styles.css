@@ -24,6 +24,8 @@
   --page: #ffffff;
   --selection: #dbeafe;
   --side-pane-width: clamp(10rem, 34vw, 15rem);
+  --side-pane-transition-duration: 180ms;
+  --side-pane-transition-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
   --tab-height: 2.25rem;
 }
 
@@ -41,11 +43,13 @@ body {
 
 body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 0 minmax(0, 1fr);
   grid-template-rows: var(--tab-height) minmax(0, 1fr);
   min-width: 320px;
   min-height: 240px;
   background: var(--page);
+  transition: grid-template-columns var(--side-pane-transition-duration)
+    var(--side-pane-transition-easing);
 }
 
 body.recent-files-visible {
@@ -68,6 +72,7 @@ button:focus-visible {
 }
 
 .tab-bar {
+  position: relative;
   grid-row: 1;
   grid-column: 1 / -1;
   display: flex;
@@ -78,21 +83,22 @@ button:focus-visible {
   -webkit-app-region: drag;
 }
 
-body.recent-files-visible .tab-bar {
-  position: relative;
-}
-
-body.recent-files-visible .tab-bar::before {
+.tab-bar::before {
   position: absolute;
   z-index: 0;
   inset: 0 auto 0 0;
-  width: var(--side-pane-width);
+  width: 0;
   pointer-events: none;
   content: '';
   background: var(--chrome);
+  transition: width var(--side-pane-transition-duration) var(--side-pane-transition-easing);
 }
 
-body.recent-files-visible .tab-bar > * {
+body.recent-files-visible .tab-bar::before {
+  width: var(--side-pane-width);
+}
+
+.tab-bar > * {
   position: relative;
   z-index: 1;
 }
@@ -202,8 +208,10 @@ body.platform-darwin.recent-files-visible .side-pane-toggle {
 
 .side-pane-toggle {
   width: var(--tab-height);
+  margin-right: 0;
   color: var(--chrome-text-muted);
   border-radius: 0;
+  transition: margin-right var(--side-pane-transition-duration) var(--side-pane-transition-easing);
   -webkit-app-region: no-drag;
 }
 
@@ -251,24 +259,19 @@ body.platform-darwin.recent-files-visible .side-pane-toggle {
 }
 
 #editor {
-  grid-area: 2 / 1;
+  grid-area: 2 / 2;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
 .empty-workspace {
-  grid-area: 2 / 1;
+  grid-area: 2 / 2;
   display: grid;
   place-items: center;
   min-width: 0;
   min-height: 0;
   color: var(--chrome-text);
-}
-
-body.recent-files-visible #editor,
-body.recent-files-visible .empty-workspace {
-  grid-column: 2;
 }
 
 body.workspace-empty .tab-list,
@@ -284,8 +287,33 @@ body.workspace-empty .open-files {
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   color: var(--chrome-text);
+  visibility: hidden;
   background: var(--chrome);
+  pointer-events: none;
+  transition: visibility 0s linear var(--side-pane-transition-duration);
+}
+
+body.recent-files-visible .recent-files-pane {
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+.recent-files-pane > * {
+  width: var(--side-pane-width);
+  opacity: 0;
+  transform: translateX(-0.35rem);
+  transition:
+    opacity 100ms ease-out,
+    transform var(--side-pane-transition-duration) var(--side-pane-transition-easing);
+}
+
+body.recent-files-visible .recent-files-pane > * {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: 30ms, 0s;
 }
 
 .recent-files-pane__header {
@@ -653,6 +681,18 @@ body.workspace-empty .open-files {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  body,
+  .tab-bar::before,
+  .side-pane-toggle,
+  .recent-files-pane,
+  .recent-files-pane > * {
+    transition: none;
+  }
+
+  .recent-files-pane > * {
+    transform: none;
+  }
+
   .empty-workspace__action {
     transition: none;
   }
